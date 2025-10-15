@@ -1,0 +1,198 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions for validation
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isValidUserData() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['uid', 'email', 'name', 'role', 'qrId', 'createdAt', 'updatedAt', 'isActive']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.name is string &&
+             data.role in ['patient', 'doctor', 'pharmacy', 'chw'] &&
+             data.qrId is string &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             data.isActive is bool &&
+             // Optional fields validation
+             (!data.keys().hasAny(['age']) || data.age is number) &&
+             (!data.keys().hasAny(['photoURL']) || data.photoURL is string) &&
+             (!data.keys().hasAny(['phoneNumber']) || data.phoneNumber is string) &&
+             (!data.keys().hasAny(['lastLoginAt']) || data.lastLoginAt is timestamp);
+    }
+    
+    function isValidUserUpdate() {
+      let data = request.resource.data;
+      let existingData = resource.data;
+      // Prevent changing critical fields
+      return data.uid == existingData.uid &&
+             data.email == existingData.email &&
+             data.createdAt == existingData.createdAt &&
+             data.qrId == existingData.qrId &&
+             // Allow updating other fields with validation
+             isValidUserData();
+    }
+    
+    // Users collection - users can only read/write their own profile
+    match /users/{userId} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      
+      allow create: if isAuthenticated() && 
+                   isOwner(userId) && 
+                   isValidUserData() &&
+                   request.resource.data.uid == request.auth.uid &&
+                   request.resource.data.email == request.auth.token.email;
+      
+      allow update: if isAuthenticated() && 
+                   isOwner(userId) && 
+                   isValidUserUpdate();
+      
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Appointments - patients and doctors can access their appointments
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(resource.data.patient_id) || 
+                  isOwner(resource.data.doctor_id));
+      
+      allow create: if isAuthenticated() && 
+                   (getUserRole() in ['patient', 'doctor', 'chw']) &&
+                   (isOwner(request.resource.data.patient_id) || 
+                    isOwner(request.resource.data.doctor_id));
+      
+      allow update: if isAuthenticated() && 
+                   (isOwner(resource.data.patient_id) || 
+                    isOwner(resource.data.doctor_id)) &&
+                   // Prevent changing patient/doctor IDs
+                   request.resource.data.patient_id == resource.data.patient_id &&
+                   request.resource.data.doctor_id == resource.data.doctor_id;
+      
+      allow delete: if isAuthenticated() && 
+                   (isOwner(resource.data.patient_id) || 
+                    isOwner(resource.data.doctor_id));
+    }
+    
+    // Prescriptions - patients and doctors can access
+    match /prescriptions/{prescriptionId} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(resource.data.patient_id) || 
+                  isOwner(resource.data.doctor_id));
+      
+      allow create: if isAuthenticated() && 
+                   getUserRole() in ['doctor', 'chw'] &&
+                   isOwner(request.resource.data.doctor_id);
+      
+      allow update: if isAuthenticated() && 
+                   isOwner(resource.data.doctor_id) &&
+                   // Prevent changing patient/doctor IDs
+                   request.resource.data.patient_id == resource.data.patient_id &&
+                   request.resource.data.doctor_id == resource.data.doctor_id;
+      
+      allow delete: if isAuthenticated() && 
+                   isOwner(resource.data.doctor_id);
+    }
+    
+    // Pharmacies - public read, only pharmacy users can write
+    match /pharmacies/{pharmacyId} {
+      allow read: if isAuthenticated();
+      
+      allow create, update, delete: if isAuthenticated() && 
+                                   getUserRole() == 'pharmacy' &&
+                                   isOwner(request.resource.data.owner_id);
+    }
+    
+    // Pharmacy inventory - only pharmacy users can access their inventory
+    match /pharmacy_inventory/{inventoryId} {
+      allow read, write: if isAuthenticated() && 
+                        getUserRole() == 'pharmacy' &&
+                        isOwner(resource.data.pharmacy_owner_id);
+    }
+    
+    // CHW cases - only CHWs can access their cases
+    match /chw_cases/{caseId} {
+      allow read, write: if isAuthenticated() && 
+                        getUserRole() == 'chw' &&
+                        isOwner(resource.data.chw_id);
+    }
+    
+    // Consultation sessions - patients and doctors can access
+    match /consultation_sessions/{sessionId} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(resource.data.patient_id) || 
+                  isOwner(resource.data.doctor_id));
+      
+      allow create: if isAuthenticated() && 
+                   getUserRole() in ['doctor', 'patient'] &&
+                   (isOwner(request.resource.data.patient_id) || 
+                    isOwner(request.resource.data.doctor_id));
+      
+      allow update: if isAuthenticated() && 
+                   (isOwner(resource.data.patient_id) || 
+                    isOwner(resource.data.doctor_id));
+      
+      allow delete: if isAuthenticated() && 
+                   isOwner(resource.data.doctor_id);
+    }
+    
+    // Medication orders - patients, doctors, and pharmacies can access
+    match /medication_orders/{orderId} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(resource.data.patient_id) || 
+                  isOwner(resource.data.doctor_id) ||
+                  (getUserRole() == 'pharmacy' && isOwner(resource.data.pharmacy_id)));
+      
+      allow create: if isAuthenticated() && 
+                   getUserRole() in ['doctor', 'patient'] &&
+                   (isOwner(request.resource.data.patient_id) || 
+                    isOwner(request.resource.data.doctor_id));
+      
+      allow update: if isAuthenticated() && 
+                   (isOwner(resource.data.patient_id) || 
+                    isOwner(resource.data.doctor_id) ||
+                    (getUserRole() == 'pharmacy' && isOwner(resource.data.pharmacy_id)));
+    }
+    
+    // Health records - patients and their doctors can access
+    match /health_records/{recordId} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(resource.data.patient_id) || 
+                  getUserRole() in ['doctor', 'chw']);
+      
+      allow create, update: if isAuthenticated() && 
+                           getUserRole() in ['doctor', 'chw'] &&
+                           // Ensure patient_id is set and valid
+                           request.resource.data.keys().hasAll(['patient_id']) &&
+                           request.resource.data.patient_id is string;
+      
+      allow delete: if isAuthenticated() && 
+                   getUserRole() == 'doctor';
+    }
+    
+    // System settings - public settings can be read by all authenticated users
+    match /system_settings/{settingId} {
+      allow read: if isAuthenticated() && 
+                 resource.data.is_public == true;
+      // Write operations handled server-side only
+    }
+    
+    // Audit log - read-only for authenticated users (their own actions)
+    match /audit_log/{logId} {
+      allow read: if isAuthenticated() && 
+                 isOwner(resource.data.user_id);
+      // Write operations handled server-side only
+    }
+  }
+}

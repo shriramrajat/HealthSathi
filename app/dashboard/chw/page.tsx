@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -123,6 +124,7 @@ const mockAppointments = [
 ]
 
 export default function CHWDashboard() {
+  const { user } = useAuth()
   const [newPatient, setNewPatient] = useState({
     name: "",
     age: "",
@@ -173,33 +175,13 @@ export default function CHWDashboard() {
   const upcomingAppointments = mockAppointments.filter((a) => a.status === "scheduled" || a.status === "confirmed")
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <Heart className="h-8 w-8 text-primary mr-3" />
-              <h1 className="text-xl font-semibold text-foreground">Rural Health Portal</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="secondary">Community Health Worker</Badge>
-              <Button variant="outline" size="sm">
-                <User className="h-4 w-4 mr-2" />
-                CHW Maria Garcia
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-2">Community Health Dashboard</h2>
-          <p className="text-muted-foreground">
-            Supporting rural communities with healthcare coordination and patient assistance
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-foreground mb-2">Community Health Dashboard</h2>
+        <p className="text-muted-foreground">
+          Supporting rural communities with healthcare coordination and patient assistance
+        </p>
+      </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
@@ -955,8 +937,7 @@ export default function CHWDashboard() {
               </Card>
             </div>
           </TabsContent>
-        </Tabs>
-      </div>
+      </Tabs>
     </div>
   )
 }

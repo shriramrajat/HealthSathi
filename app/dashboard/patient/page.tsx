@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -79,6 +80,7 @@ const symptomRules = {
 }
 
 export default function PatientDashboard() {
+  const { user } = useAuth()
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([])
   const [symptomAdvice, setSymptomAdvice] = useState<string>("")
   const [searchMedicine, setSearchMedicine] = useState("")
@@ -111,31 +113,11 @@ export default function PatientDashboard() {
   )
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <Heart className="h-8 w-8 text-primary mr-3" />
-              <h1 className="text-xl font-semibold text-foreground">Rural Health Portal</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="secondary">Patient</Badge>
-              <Button variant="outline" size="sm">
-                <User className="h-4 w-4 mr-2" />
-                John Doe
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-2">Welcome back, John</h2>
-          <p className="text-muted-foreground">Manage your health and connect with healthcare providers</p>
-        </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-foreground mb-2">Welcome back, {user?.name?.split(' ')[0] || 'Patient'}</h2>
+        <p className="text-muted-foreground">Manage your health and connect with healthcare providers</p>
+      </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">
@@ -431,15 +413,15 @@ export default function PatientDashboard() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Full Name</Label>
-                    <Input value="John Doe" readOnly />
+                    <Input value={user?.name || ''} readOnly />
                   </div>
                   <div className="space-y-2">
                     <Label>Email</Label>
-                    <Input value="john.doe@email.com" readOnly />
+                    <Input value={user?.email || ''} readOnly />
                   </div>
                   <div className="space-y-2">
                     <Label>Age</Label>
-                    <Input value="35" readOnly />
+                    <Input value={user?.age?.toString() || ''} readOnly />
                   </div>
                   <div className="space-y-2">
                     <Label>Role</Label>
@@ -455,18 +437,17 @@ export default function PatientDashboard() {
                 </CardHeader>
                 <CardContent className="flex flex-col items-center space-y-4">
                   <div className="p-4 bg-white rounded-lg">
-                    <QRCode value="QR-DEMO123" size={150} />
+                    <QRCode value={user?.qrId || 'QR-DEMO123'} size={150} />
                   </div>
                   <div className="text-center">
-                    <p className="font-mono text-sm">QR-DEMO123</p>
+                    <p className="font-mono text-sm">{user?.qrId || 'QR-DEMO123'}</p>
                     <p className="text-xs text-muted-foreground">Show this to healthcare providers</p>
                   </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
-        </Tabs>
-      </div>
+      </Tabs>
     </div>
   )
 }

@@ -1,0 +1,72 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isValidImageFile() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+    
+    function isValidDocumentFile() {
+      return request.resource.contentType in ['application/pdf', 'image/jpeg', 'image/png'] &&
+             request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+    
+    // Profile pictures - users can only manage their own profile pictures
+    match /profiles/{userId}/{fileName} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow write: if isAuthenticated() && 
+                  isOwner(userId) && 
+                  isValidImageFile();
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Prescription files - only patient and prescribing doctor can access
+    match /prescriptions/{userId}/{fileName} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow write: if isAuthenticated() && 
+                  isOwner(userId) && 
+                  isValidDocumentFile();
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Medical records - patients and doctors can access
+    match /medical_records/{patientId}/{fileName} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(patientId) || 
+                  firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'chw']);
+      
+      allow write: if isAuthenticated() && 
+                  firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'chw'] &&
+                  isValidDocumentFile();
+      
+      allow delete: if isAuthenticated() && 
+                   firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+    }
+    
+    // Consultation recordings - only session participants can access
+    match /consultations/{sessionId}/{fileName} {
+      allow read, write: if isAuthenticated();
+      // Additional validation would be done server-side to check session participation
+    }
+    
+    // Pharmacy inventory images
+    match /pharmacy_inventory/{pharmacyId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+                  firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'pharmacy' &&
+                  isValidImageFile();
+      allow delete: if isAuthenticated() && 
+                   firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'pharmacy';
+    }
+  }
+}
