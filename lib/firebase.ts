@@ -114,15 +114,35 @@ export async function getFirebaseFirestore() {
 
     dbInstance = firestoreModule.getFirestore(app)
     
-    // Enable offline persistence for better performance
+    // Enable offline persistence with enhanced configuration
     try {
-      await firestoreModule.enableIndexedDbPersistence(dbInstance)
+      await firestoreModule.enableIndexedDbPersistence(dbInstance, {
+        synchronizeTabs: true // Enable multi-tab synchronization
+      })
+      console.log('Firestore offline persistence enabled')
     } catch (err: any) {
       if (err.code === 'failed-precondition') {
-        console.warn('Firestore persistence failed: Multiple tabs open')
+        console.warn('Firestore persistence failed: Multiple tabs open, trying without tab sync')
+        try {
+          await firestoreModule.enableIndexedDbPersistence(dbInstance, {
+            synchronizeTabs: false
+          })
+          console.log('Firestore offline persistence enabled (single tab)')
+        } catch (fallbackErr) {
+          console.warn('Firestore persistence completely failed:', fallbackErr)
+        }
       } else if (err.code === 'unimplemented') {
         console.warn('Firestore persistence not available in this browser')
+      } else {
+        console.warn('Firestore persistence failed:', err)
       }
+    }
+
+    // Configure offline settings
+    try {
+      await firestoreModule.enableNetwork(dbInstance)
+    } catch (err) {
+      console.warn('Failed to enable Firestore network:', err)
     }
 
     performanceMetrics.firestoreLoadTime = performance.now() - startTime

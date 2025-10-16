@@ -62,47 +62,61 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isOwner(userId);
     }
     
+    // Patients collection - doctors can read all patients, patients can read their own data
+    match /patients/{patientId} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(patientId) || getUserRole() in ['doctor', 'chw']);
+      
+      allow create: if isAuthenticated() && 
+                   (isOwner(patientId) || getUserRole() in ['doctor', 'chw']);
+      
+      allow update: if isAuthenticated() && 
+                   (isOwner(patientId) || getUserRole() in ['doctor', 'chw']);
+      
+      allow delete: if isAuthenticated() && getUserRole() == 'doctor';
+    }
+
     // Appointments - patients and doctors can access their appointments
     match /appointments/{appointmentId} {
       allow read: if isAuthenticated() && 
-                 (isOwner(resource.data.patient_id) || 
-                  isOwner(resource.data.doctor_id));
+                 (isOwner(resource.data.patientId) || 
+                  isOwner(resource.data.doctorId));
       
       allow create: if isAuthenticated() && 
                    (getUserRole() in ['patient', 'doctor', 'chw']) &&
-                   (isOwner(request.resource.data.patient_id) || 
-                    isOwner(request.resource.data.doctor_id));
+                   (isOwner(request.resource.data.patientId) || 
+                    isOwner(request.resource.data.doctorId));
       
       allow update: if isAuthenticated() && 
-                   (isOwner(resource.data.patient_id) || 
-                    isOwner(resource.data.doctor_id)) &&
+                   (isOwner(resource.data.patientId) || 
+                    isOwner(resource.data.doctorId)) &&
                    // Prevent changing patient/doctor IDs
-                   request.resource.data.patient_id == resource.data.patient_id &&
-                   request.resource.data.doctor_id == resource.data.doctor_id;
+                   request.resource.data.patientId == resource.data.patientId &&
+                   request.resource.data.doctorId == resource.data.doctorId;
       
       allow delete: if isAuthenticated() && 
-                   (isOwner(resource.data.patient_id) || 
-                    isOwner(resource.data.doctor_id));
+                   (isOwner(resource.data.patientId) || 
+                    isOwner(resource.data.doctorId));
     }
     
     // Prescriptions - patients and doctors can access
     match /prescriptions/{prescriptionId} {
       allow read: if isAuthenticated() && 
-                 (isOwner(resource.data.patient_id) || 
-                  isOwner(resource.data.doctor_id));
+                 (isOwner(resource.data.patientId) || 
+                  isOwner(resource.data.doctorId));
       
       allow create: if isAuthenticated() && 
                    getUserRole() in ['doctor', 'chw'] &&
-                   isOwner(request.resource.data.doctor_id);
+                   isOwner(request.resource.data.doctorId);
       
       allow update: if isAuthenticated() && 
-                   isOwner(resource.data.doctor_id) &&
+                   isOwner(resource.data.doctorId) &&
                    // Prevent changing patient/doctor IDs
-                   request.resource.data.patient_id == resource.data.patient_id &&
-                   request.resource.data.doctor_id == resource.data.doctor_id;
+                   request.resource.data.patientId == resource.data.patientId &&
+                   request.resource.data.doctorId == resource.data.doctorId;
       
       allow delete: if isAuthenticated() && 
-                   isOwner(resource.data.doctor_id);
+                   isOwner(resource.data.doctorId);
     }
     
     // Pharmacies - public read, only pharmacy users can write
@@ -128,23 +142,23 @@ service cloud.firestore {
                         isOwner(resource.data.chw_id);
     }
     
-    // Consultation sessions - patients and doctors can access
-    match /consultation_sessions/{sessionId} {
+    // Consultations - patients and doctors can access
+    match /consultations/{consultationId} {
       allow read: if isAuthenticated() && 
-                 (isOwner(resource.data.patient_id) || 
-                  isOwner(resource.data.doctor_id));
+                 (isOwner(resource.data.patientId) || 
+                  isOwner(resource.data.doctorId));
       
       allow create: if isAuthenticated() && 
                    getUserRole() in ['doctor', 'patient'] &&
-                   (isOwner(request.resource.data.patient_id) || 
-                    isOwner(request.resource.data.doctor_id));
+                   (isOwner(request.resource.data.patientId) || 
+                    isOwner(request.resource.data.doctorId));
       
       allow update: if isAuthenticated() && 
-                   (isOwner(resource.data.patient_id) || 
-                    isOwner(resource.data.doctor_id));
+                   (isOwner(resource.data.patientId) || 
+                    isOwner(resource.data.doctorId));
       
       allow delete: if isAuthenticated() && 
-                   isOwner(resource.data.doctor_id);
+                   isOwner(resource.data.doctorId);
     }
     
     // Medication orders - patients, doctors, and pharmacies can access

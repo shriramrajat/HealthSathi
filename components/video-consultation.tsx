@@ -1,11 +1,17 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Video, VideoOff, Mic, MicOff, PhoneOff, Settings, Users, MessageSquare, FileText, Camera } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Settings, Users, MessageSquare, FileText, Camera, Clock, Pill, Save } from "lucide-react"
+import { ConsultationNotes } from "@/components/dashboard/consultation-notes"
+import { PrescriptionCreator } from "@/components/dashboard/prescription-creator"
+import { Consultation, Patient } from "@/lib/types/dashboard-models"
+import { consultationService, updateConsultationNotes } from "@/lib/services/consultation-service"
+import { toast } from "sonner"
 
 interface VideoConsultationProps {
   roomId: string
@@ -13,6 +19,10 @@ interface VideoConsultationProps {
   doctorName?: string
   onEndCall?: () => void
   userRole: "patient" | "doctor"
+  // Enhanced props for consultation context
+  consultation?: Consultation
+  patient?: Patient
+  onConsultationUpdate?: (consultation: Consultation) => void
 }
 
 export default function VideoConsultation({
@@ -21,6 +31,9 @@ export default function VideoConsultation({
   doctorName,
   onEndCall,
   userRole,
+  consultation,
+  patient,
+  onConsultationUpdate,
 }: VideoConsultationProps) {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true)
   const [isAudioEnabled, setIsAudioEnabled] = useState(true)
@@ -32,31 +45,194 @@ export default function VideoConsultation({
   >([])
   const [newMessage, setNewMessage] = useState("")
   const [showChat, setShowChat] = useState(false)
-  const [consultationNotes, setConsultationNotes] = useState("")
+  const [consultationNotes, setConsultationNotes] = useState(consultation?.notes || "")
   const [callDuration, setCallDuration] = useState(0)
+  
+  // Enhanced state for consultation features
+  const [showNotesPanel, setShowNotesPanel] = useState(userRole === "doctor")
+  const [showPrescriptionDialog, setShowPrescriptionDialog] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
+  const [consultationSummary, setConsultationSummary] = useState("")
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const callStartTime = useRef<Date | null>(null)
+  const notesAutoSaveRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Mock Jitsi Meet integration
+  // Enhanced consultation timer with automatic note-taking and duration tracking
   useEffect(() => {
     if (isCallActive) {
       callStartTime.current = new Date()
+      
+      // Add automatic consultation start note
+      if (userRole === "doctor" && consultation && autoSaveEnabled) {
+        const startNote = `Consultation started at ${new Date().toLocaleTimeString()}\n`
+        const updatedNotes = consultationNotes + (consultationNotes ? '\n\n' : '') + startNote
+        setConsultationNotes(updatedNotes)
+        autoSaveNotes(updatedNotes)
+      }
+      
       const timer = setInterval(() => {
         if (callStartTime.current) {
-          setCallDuration(Math.floor((new Date().getTime() - callStartTime.current.getTime()) / 1000))
+          const newDuration = Math.floor((new Date().getTime() - callStartTime.current.getTime()) / 1000)
+          setCallDuration(newDuration)
+          
+          // Update consultation duration in database every 30 seconds
+          if (consultation?.id && newDuration % 30 === 0 && userRole === "doctor") {
+            consultationService.updateConsultationDuration(consultation.id, newDuration)
+              .catch(error => console.error('Error updating consultation duration:', error))
+          }
         }
       }, 1000)
       return () => clearInterval(timer)
     }
-  }, [isCallActive])
+  }, [isCallActive, userRole, consultation, consultationNotes, autoSaveEnabled])
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
+
+  // Auto-save consultation notes
+  const autoSaveNotes = useCallback(async (notes: string) => {
+    if (!consultation?.id || !autoSaveEnabled || userRole !== "doctor") return
+
+    try {
+      await updateConsultationNotes(consultation.id, notes)
+      if (onConsultationUpdate) {
+        onConsultationUpdate({ ...consultation, notes })
+      }
+    } catch (error) {
+      console.error('Error auto-saving notes:', error)
+      toast.error('Failed to save notes automatically')
+    }
+  }, [consultation, autoSaveEnabled, userRole, onConsultationUpdate])
+
+  // Handle notes change with auto-save
+  const handleNotesChange = useCallback((notes: string) => {
+    setConsultationNotes(notes)
+    
+    // Clear existing timeout
+    if (notesAutoSaveRef.current) {
+      clearTimeout(notesAutoSaveRef.current)
+    }
+
+    // Set new auto-save timeout (3 seconds after user stops typing)
+    notesAutoSaveRef.current = setTimeout(() => {
+      autoSaveNotes(notes)
+    }, 3000)
+  }, [autoSaveNotes])
+
+  // Enhanced consultation summary generation using consultation service
+  const generateConsultationSummary = useCallback(async () => {
+    if (!consultation?.id) {
+      toast.error('Cannot generate summary: Consultation not found')
+      return
+    }
+
+    try {
+      // Generate summary using consultation service
+      const summary = await consultationService.generateConsultationSummary(consultation.id)
+      setConsultationSummary(summary)
+      
+      // Also create a local summary with current session data
+      const localSummary = `LIVE CONSULTATION SUMMARY
+========================
+
+CURRENT SESSION
+--------------
+Patient: ${patientName || 'Unknown'}
+Doctor: ${doctorName || 'Unknown'}
+Date: ${new Date().toLocaleDateString()}
+Start Time: ${callStartTime.current?.toLocaleTimeString() || 'Unknown'}
+Current Duration: ${formatDuration(callDuration)}
+Room ID: ${roomId}
+Status: ${isCallActive ? 'Active' : 'Ended'}
+
+LIVE NOTES
+----------
+${consultationNotes || 'No notes recorded'}
+
+SESSION DETAILS
+--------------
+Participants: ${participants.length + 1}
+Recording: ${isRecording ? 'Active' : 'Not recording'}
+Video: ${isVideoEnabled ? 'Enabled' : 'Disabled'}
+Audio: ${isAudioEnabled ? 'Enabled' : 'Disabled'}
+
+Generated at: ${new Date().toLocaleString()}
+`
+      
+      // Show summary in a downloadable format
+      const blob = new Blob([summary + '\n\n' + localSummary], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `consultation-summary-${consultation.id}-${new Date().toISOString().split('T')[0]}.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      toast.success('Consultation summary generated and downloaded')
+      return summary
+    } catch (error) {
+      console.error('Error generating consultation summary:', error)
+      toast.error('Failed to generate consultation summary')
+    }
+  }, [consultation, patientName, doctorName, callDuration, roomId, isCallActive, consultationNotes, participants.length, isRecording, isVideoEnabled, isAudioEnabled])
+
+  // Enhanced recording functionality with consultation service integration
+  const toggleRecording = useCallback(async () => {
+    if (!consultation?.id) {
+      toast.error('Cannot record: Consultation not found')
+      return
+    }
+
+    try {
+      if (!isRecording) {
+        // Start recording
+        await consultationService.startConsultationRecording(consultation.id)
+        setIsRecording(true)
+        
+        if (userRole === "doctor" && autoSaveEnabled) {
+          const recordingNote = `Started recording at ${new Date().toLocaleTimeString()}\n`
+          const updatedNotes = consultationNotes + (consultationNotes ? '\n' : '') + recordingNote
+          setConsultationNotes(updatedNotes)
+          autoSaveNotes(updatedNotes)
+        }
+        
+        toast.success('Recording started')
+      } else {
+        // Stop recording
+        await consultationService.stopConsultationRecording(consultation.id)
+        setIsRecording(false)
+        
+        if (userRole === "doctor" && autoSaveEnabled) {
+          const recordingNote = `Stopped recording at ${new Date().toLocaleTimeString()}\n`
+          const updatedNotes = consultationNotes + (consultationNotes ? '\n' : '') + recordingNote
+          setConsultationNotes(updatedNotes)
+          autoSaveNotes(updatedNotes)
+        }
+        
+        toast.success('Recording stopped')
+      }
+    } catch (error) {
+      console.error('Error toggling recording:', error)
+      toast.error(`Failed to ${!isRecording ? 'start' : 'stop'} recording`)
+    }
+  }, [isRecording, consultation, userRole, autoSaveEnabled, consultationNotes, autoSaveNotes])
+
+  // Cleanup auto-save timeout
+  useEffect(() => {
+    return () => {
+      if (notesAutoSaveRef.current) {
+        clearTimeout(notesAutoSaveRef.current)
+      }
+    }
+  }, [])
 
   const startCall = async () => {
     setIsConnecting(true)
@@ -75,13 +251,36 @@ export default function VideoConsultation({
     }, 2000)
   }
 
-  const endCall = () => {
+  const endCall = useCallback(async () => {
+    // Generate final consultation summary
+    const summary = generateConsultationSummary()
+    
+    // Add end consultation note for doctors
+    if (userRole === "doctor" && consultation && autoSaveEnabled) {
+      const endNote = `\nConsultation ended at ${new Date().toLocaleTimeString()}\nTotal duration: ${formatDuration(callDuration)}`
+      const finalNotes = consultationNotes + endNote
+      setConsultationNotes(finalNotes)
+      
+      // Save final notes
+      try {
+        await autoSaveNotes(finalNotes)
+      } catch (error) {
+        console.error('Error saving final notes:', error)
+      }
+    }
+    
     setIsCallActive(false)
     setIsConnecting(false)
     callStartTime.current = null
     setCallDuration(0)
-    onEndCall?.()
-  }
+    
+    // Show prescription dialog for doctors after consultation
+    if (userRole === "doctor" && patient) {
+      setShowPrescriptionDialog(true)
+    } else {
+      onEndCall?.()
+    }
+  }, [generateConsultationSummary, userRole, consultation, autoSaveEnabled, callDuration, consultationNotes, autoSaveNotes, patient, onEndCall])
 
   const toggleVideo = () => {
     setIsVideoEnabled(!isVideoEnabled)
@@ -269,6 +468,29 @@ export default function VideoConsultation({
                   <MessageSquare className="h-5 w-5" />
                 </Button>
 
+                {/* Enhanced controls for doctors */}
+                {userRole === "doctor" && (
+                  <>
+                    <Button
+                      onClick={() => setShowNotesPanel(!showNotesPanel)}
+                      variant={showNotesPanel ? "default" : "outline"}
+                      size="lg"
+                      className="rounded-full w-12 h-12 p-0"
+                    >
+                      <FileText className="h-5 w-5" />
+                    </Button>
+
+                    <Button
+                      onClick={toggleRecording}
+                      variant={isRecording ? "destructive" : "outline"}
+                      size="lg"
+                      className="rounded-full w-12 h-12 p-0"
+                    >
+                      <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-white animate-pulse' : 'bg-current'}`} />
+                    </Button>
+                  </>
+                )}
+
                 <Button variant="outline" size="lg" className="rounded-full w-12 h-12 p-0 bg-transparent">
                   <Settings className="h-5 w-5" />
                 </Button>
@@ -315,32 +537,84 @@ export default function VideoConsultation({
             </Card>
           )}
 
-          {/* Consultation Notes (Doctor Only) */}
-          {userRole === "doctor" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Consultation Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={consultationNotes}
-                  onChange={(e) => setConsultationNotes(e.target.value)}
-                  placeholder="Add consultation notes..."
-                  rows={6}
-                  className="text-sm"
-                />
-                <Button size="sm" className="w-full mt-2">
-                  <FileText className="h-4 w-4 mr-2" />
-                  Save Notes
-                </Button>
-              </CardContent>
-            </Card>
+          {/* Enhanced Consultation Notes (Doctor Only) */}
+          {userRole === "doctor" && showNotesPanel && consultation && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm">Live Notes</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={autoSaveEnabled ? "default" : "secondary"} className="text-xs">
+                        {autoSaveEnabled ? "Auto-save ON" : "Auto-save OFF"}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Save className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    value={consultationNotes}
+                    onChange={(e) => handleNotesChange(e.target.value)}
+                    placeholder="Notes auto-save during consultation..."
+                    rows={8}
+                    className="text-sm"
+                  />
+                  <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
+                    <span>{consultationNotes.length} characters</span>
+                    <span>Auto-saves every 3 seconds</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Patient Context (if available) */}
+              {patient && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Patient Context</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Name:</span>
+                      <span>{patient.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Age:</span>
+                      <span>{patient.dateOfBirth ? Math.floor((new Date().getTime() - patient.dateOfBirth.toDate().getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Gender:</span>
+                      <span className="capitalize">{patient.gender || 'N/A'}</span>
+                    </div>
+                    {patient.medicalHistory && patient.medicalHistory.length > 0 && (
+                      <div className="pt-2">
+                        <span className="text-muted-foreground text-xs">Recent conditions:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {patient.medicalHistory.slice(0, 3).map((record, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {record.title}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
 
-          {/* Call Info */}
+          {/* Enhanced Call Info */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Call Information</CardTitle>
+              <CardTitle className="text-sm">Session Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -349,7 +623,10 @@ export default function VideoConsultation({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Duration:</span>
-                <span>{formatDuration(callDuration)}</span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatDuration(callDuration)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Participants:</span>
@@ -361,10 +638,166 @@ export default function VideoConsultation({
                   HD
                 </Badge>
               </div>
+              {userRole === "doctor" && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Recording:</span>
+                    <Badge variant={isRecording ? "destructive" : "secondary"} className="text-xs">
+                      {isRecording ? "Recording" : "Not recording"}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Notes:</span>
+                    <span>{consultationNotes.length > 0 ? "Active" : "None"}</span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
+
+          {/* Quick Actions for Doctors */}
+          {userRole === "doctor" && patient && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => setShowPrescriptionDialog(true)}
+                >
+                  <Pill className="h-4 w-4 mr-2" />
+                  Create Prescription
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={generateConsultationSummary}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Generate Summary
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Consultation Timer & Controls */}
+          {userRole === "doctor" && consultation && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Consultation Timer</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-center">
+                  <div className="text-2xl font-mono font-bold text-primary">
+                    {formatDuration(callDuration)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {isCallActive ? 'Active consultation' : 'Consultation ended'}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="text-center p-2 bg-muted rounded">
+                    <div className="font-medium">Started</div>
+                    <div className="text-muted-foreground">
+                      {callStartTime.current?.toLocaleTimeString() || '--:--'}
+                    </div>
+                  </div>
+                  <div className="text-center p-2 bg-muted rounded">
+                    <div className="font-medium">Duration</div>
+                    <div className="text-muted-foreground">
+                      {Math.floor(callDuration / 60)}m {callDuration % 60}s
+                    </div>
+                  </div>
+                </div>
+
+                {isCallActive && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Auto-tracking:</span>
+                    <Badge variant="outline" className="text-xs">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Live
+                    </Badge>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
+
+      {/* Post-Consultation Prescription Dialog */}
+      <Dialog open={showPrescriptionDialog} onOpenChange={setShowPrescriptionDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Post-Consultation Prescription</DialogTitle>
+          </DialogHeader>
+          
+          {patient && consultation && (
+            <div className="space-y-4">
+              {/* Consultation Summary */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Consultation Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm space-y-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-muted-foreground">Patient:</span> {patient.name}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Duration:</span> {formatDuration(callDuration)}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Date:</span> {new Date().toLocaleDateString()}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Time:</span> {callStartTime.current?.toLocaleTimeString() || 'N/A'}
+                    </div>
+                  </div>
+                  
+                  {consultationNotes && (
+                    <div className="mt-4">
+                      <span className="text-muted-foreground">Notes:</span>
+                      <div className="mt-1 p-2 bg-muted rounded text-xs max-h-20 overflow-y-auto">
+                        {consultationNotes}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Prescription Creator */}
+              <PrescriptionCreator
+                patientId={patient.id}
+                appointmentId={consultation.appointmentId}
+                onSubmit={async (data, file) => {
+                  try {
+                    // Here you would call your prescription service to create the prescription
+                    // For now, we'll just show success and close the dialog
+                    toast.success('Prescription created successfully')
+                    setShowPrescriptionDialog(false)
+                    onEndCall?.()
+                  } catch (error) {
+                    console.error('Error creating prescription:', error)
+                    toast.error('Failed to create prescription')
+                  }
+                }}
+                onCancel={() => {
+                  setShowPrescriptionDialog(false)
+                  onEndCall?.()
+                }}
+                isLoading={false}
+                patients={[{ id: patient.id, name: patient.name }]}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

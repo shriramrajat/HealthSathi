@@ -23,8 +23,10 @@ export const firebaseConfig: FirebaseConfig = {
 // Firestore collection names
 export const COLLECTIONS = {
   USERS: "users",
+  PATIENTS: "patients",
   APPOINTMENTS: "appointments",
   PRESCRIPTIONS: "prescriptions",
+  CONSULTATIONS: "consultations",
   PHARMACIES: "pharmacies",
   PHARMACY_INVENTORY: "pharmacy_inventory",
   CHW_CASES: "chw_cases",
