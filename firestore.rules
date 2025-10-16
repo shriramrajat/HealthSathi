@@ -202,6 +202,128 @@ service cloud.firestore {
       // Write operations handled server-side only
     }
     
+    // Pharmacy stock - only pharmacy users can access their inventory
+    match /pharmacy-stock/{stockId} {
+      allow read, write: if isAuthenticated() && 
+                        getUserRole() == 'pharmacy' &&
+                        isOwner(resource.data.pharmacyId);
+    }
+    
+    // Prescription queue - pharmacies can access their queue
+    match /prescription-queue/{queueId} {
+      allow read, write: if isAuthenticated() && 
+                        getUserRole() == 'pharmacy' &&
+                        isOwner(resource.data.pharmacyId);
+    }
+    
+    // CHW logs - only CHWs can access their logs
+    match /chw-logs/{logId} {
+      allow read, write: if isAuthenticated() && 
+                        getUserRole() == 'chw' &&
+                        isOwner(resource.data.chwId);
+    }
+    
+    // Emergency logs - CHWs and doctors can access
+    match /emergency-logs/{logId} {
+      allow read: if isAuthenticated() && 
+                 getUserRole() in ['chw', 'doctor'];
+      
+      allow create, update: if isAuthenticated() && 
+                           getUserRole() == 'chw' &&
+                           isOwner(request.resource.data.chwId);
+      
+      allow delete: if isAuthenticated() && 
+                   getUserRole() == 'doctor';
+    }
+    
+    // Symptom rules - public read for authenticated users, admin write
+    match /symptom-rules/{ruleId} {
+      allow read: if isAuthenticated();
+      // Write operations handled server-side only
+    }
+    
+    // Symptom results - patients can access their results, doctors can read all
+    match /symptom-results/{resultId} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(resource.data.patientId) || 
+                  getUserRole() in ['doctor', 'chw']);
+      
+      allow create: if isAuthenticated() && 
+                   isOwner(request.resource.data.patientId) &&
+                   request.resource.data.keys().hasAll(['patientId', 'selectedSymptoms', 'urgency', 'timestamp']) &&
+                   request.resource.data.patientId is string &&
+                   request.resource.data.selectedSymptoms is list &&
+                   request.resource.data.urgency in ['low', 'medium', 'high', 'emergency'] &&
+                   request.resource.data.timestamp is timestamp;
+      
+      allow update: if isAuthenticated() && 
+                   (isOwner(resource.data.patientId) || 
+                    getUserRole() in ['doctor', 'chw']) &&
+                   // Prevent changing core fields
+                   request.resource.data.patientId == resource.data.patientId &&
+                   request.resource.data.selectedSymptoms == resource.data.selectedSymptoms &&
+                   request.resource.data.timestamp == resource.data.timestamp;
+      
+      allow delete: if isAuthenticated() && 
+                   getUserRole() == 'doctor';
+    }
+    
+    // Symptom categories - public read for authenticated users
+    match /symptom-categories/{categoryId} {
+      allow read: if isAuthenticated();
+      // Write operations handled server-side only
+    }
+    
+    // QR health records - patients own their records, healthcare providers can access
+    match /qr-health-records/{recordId} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(resource.data.patientId) || 
+                  getUserRole() in ['doctor', 'chw', 'pharmacy']);
+      
+      allow create: if isAuthenticated() && 
+                   (isOwner(request.resource.data.patientId) || 
+                    getUserRole() in ['doctor', 'chw']);
+      
+      allow update: if isAuthenticated() && 
+                   (isOwner(resource.data.patientId) || 
+                    getUserRole() in ['doctor', 'chw']);
+      
+      allow delete: if isAuthenticated() && 
+                   getUserRole() == 'doctor';
+    }
+    
+    // QR scan logs - users can read their own scan logs, admins can read all
+    match /qr-scan-logs/{logId} {
+      allow read: if isAuthenticated() && 
+                 (isOwner(resource.data.scannedBy) || 
+                  isOwner(resource.data.patientId) ||
+                  getUserRole() == 'doctor');
+      
+      allow create: if isAuthenticated() && 
+                   isOwner(request.resource.data.scannedBy);
+      
+      // No update/delete - logs are immutable
+    }
+    
+    // Notification configs - users can manage their own notification settings
+    match /notification-configs/{configId} {
+      allow read, write: if isAuthenticated() && 
+                        isOwner(resource.data.userId);
+    }
+    
+    // Notifications - users can read their own notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && 
+                 isOwner(resource.data.userId);
+      
+      allow update: if isAuthenticated() && 
+                   isOwner(resource.data.userId) &&
+                   // Only allow updating read status
+                   request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'updatedAt']);
+      
+      // Create/delete operations handled server-side only
+    }
+    
     // Audit log - read-only for authenticated users (their own actions)
     match /audit_log/{logId} {
       allow read: if isAuthenticated() && 

@@ -6,8 +6,11 @@ import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/components/auth-provider"
 import { FirebaseErrorBoundary } from "@/components/firebase-error-boundary"
 import { QueryProvider } from "@/lib/providers/query-provider"
+import { RealTimeSyncProvider } from "@/components/providers/real-time-sync-provider"
+import { AccessibilityProvider } from "@/components/accessibility/accessibility-provider"
 import { Suspense } from "react"
 import "./globals.css"
+import "../styles/accessibility.css"
 
 export const metadata: Metadata = {
   title: "Rural Health Portal",
@@ -25,9 +28,19 @@ export default function RootLayout({
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <QueryProvider>
           <FirebaseErrorBoundary>
-            <Suspense fallback={null}>
-              <AuthProvider>{children}</AuthProvider>
-            </Suspense>
+            <AccessibilityProvider>
+              <Suspense fallback={null}>
+                <AuthProvider>
+                  <RealTimeSyncProvider
+                    enableAutoInit={true}
+                    showNetworkToasts={true}
+                    showConflictToasts={true}
+                  >
+                    {children}
+                  </RealTimeSyncProvider>
+                </AuthProvider>
+              </Suspense>
+            </AccessibilityProvider>
           </FirebaseErrorBoundary>
         </QueryProvider>
         <Analytics />

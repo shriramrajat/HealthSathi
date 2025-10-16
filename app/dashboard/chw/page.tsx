@@ -1,943 +1,702 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { SkipLink, useAnnouncement } from "@/components/accessibility/accessibility-provider"
+import { useDashboardPerformance } from "@/hooks/use-performance-monitor"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Calendar,
-  Clock,
-  FileText,
-  Heart,
+  UserPlus,
+  QrCode,
+  AlertTriangle,
+  Video,
   MapPin,
-  Phone,
-  Plus,
-  Stethoscope,
-  User,
   Users,
+  Clock,
   Activity,
-  AlertCircle,
+  FileText,
+  Calendar
 } from "lucide-react"
+import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import type { CHWLog, EmergencyLog, Patient } from "@/lib/types/healthcare-models"
+import { 
+  PatientRegistrationWithSuspense,
+  QRScannerWithSuspense,
+  EmergencyLoggerWithSuspense
+} from "@/components/lazy/lazy-dashboard-components"
 
-// Mock data
-const mockPatients = [
+// Dashboard section navigation for CHW quick actions
+const quickActions = [
   {
-    id: "P001",
-    name: "John Doe",
-    age: 35,
-    village: "Riverside Village",
-    phone: "+1234567890",
-    lastVisit: "2024-01-10",
-    condition: "Hypertension",
-    status: "active",
+    id: "register",
+    title: "Register Patient",
+    description: "Add new patient to the system with QR code generation",
+    icon: UserPlus,
+    color: "bg-blue-50 text-blue-600 border-blue-200",
+    priority: "high",
   },
   {
-    id: "P002",
-    name: "Mary Smith",
-    age: 42,
-    village: "Hillside Community",
-    phone: "+1234567891",
-    lastVisit: "2024-01-08",
-    condition: "Diabetes",
-    status: "follow-up",
+    id: "scan",
+    title: "Scan QR Code",
+    description: "Scan patient QR code to access health records",
+    icon: QrCode,
+    color: "bg-green-50 text-green-600 border-green-200",
+    priority: "high",
   },
   {
-    id: "P003",
-    name: "Robert Johnson",
-    age: 28,
-    village: "Riverside Village",
-    phone: "+1234567892",
-    lastVisit: "2024-01-12",
-    condition: "Migraine",
-    status: "referred",
+    id: "emergency",
+    title: "Emergency Alert",
+    description: "Log emergency situation with GPS location",
+    icon: AlertTriangle,
+    color: "bg-red-50 text-red-600 border-red-200",
+    priority: "critical",
+  },
+  {
+    id: "consultation",
+    title: "Book Teleconsultation",
+    description: "Schedule video consultation for patients",
+    icon: Video,
+    color: "bg-purple-50 text-purple-600 border-purple-200",
+    priority: "medium",
   },
 ]
 
-const mockCases = [
+// Secondary actions for CHW workflow
+const secondaryActions = [
   {
-    id: "C001",
-    patientName: "John Doe",
-    village: "Riverside Village",
-    caseType: "Routine Checkup",
-    symptoms: "Blood pressure monitoring",
-    date: "2024-01-15",
-    status: "completed",
-    notes: "BP stable, medication compliance good",
+    id: "patients",
+    title: "My Patients",
+    description: "View patients registered by you",
+    icon: Users,
+    action: "view_patients",
   },
   {
-    id: "C002",
-    patientName: "Mary Smith",
-    village: "Hillside Community",
-    caseType: "Emergency",
-    symptoms: "Severe headache, dizziness",
-    date: "2024-01-14",
-    status: "referred",
-    notes: "Referred to district hospital for further evaluation",
+    id: "logs",
+    title: "Activity Logs",
+    description: "Review your CHW activity history",
+    icon: FileText,
+    action: "view_logs",
   },
   {
-    id: "C003",
-    patientName: "Sarah Wilson",
-    village: "Mountain View",
-    caseType: "Preventive Care",
-    symptoms: "Vaccination follow-up",
-    date: "2024-01-13",
-    status: "scheduled",
-    notes: "Second dose of hepatitis B vaccine due",
-  },
-]
-
-const mockAppointments = [
-  {
-    id: "A001",
-    patientName: "John Doe",
-    doctorName: "Dr. Sarah Johnson",
-    date: "2024-01-16",
-    time: "10:00 AM",
-    type: "consultation",
-    status: "scheduled",
+    id: "location",
+    title: "Update Location",
+    description: "Update your current working location",
+    icon: MapPin,
+    action: "update_location",
   },
   {
-    id: "A002",
-    patientName: "Mary Smith",
-    doctorName: "Dr. Michael Chen",
-    date: "2024-01-17",
-    time: "2:30 PM",
-    type: "follow-up",
-    status: "confirmed",
+    id: "schedule",
+    title: "Today's Schedule",
+    description: "View scheduled visits and appointments",
+    icon: Calendar,
+    action: "view_schedule",
   },
 ]
 
 export default function CHWDashboard() {
   const { user } = useAuth()
-  const [newPatient, setNewPatient] = useState({
-    name: "",
-    age: "",
-    village: "",
-    phone: "",
-    condition: "",
+  const [activeSection, setActiveSection] = useState<string | null>(null)
+  
+  // Performance monitoring
+  const {
+    dashboardMetrics,
+    trackSectionLoad,
+    setTotalSections,
+    markCriticalDataLoaded
+  } = useDashboardPerformance('chw')
+  
+  // Accessibility announcements
+  const { announce } = useAnnouncement()
+
+  // Initialize dashboard sections count
+  useEffect(() => {
+    setTotalSections(4) // register, scan, emergency, consultation
+  }, [setTotalSections])
+  const [recentLogs, setRecentLogs] = useState<CHWLog[]>([])
+  const [emergencyLogs, setEmergencyLogs] = useState<EmergencyLog[]>([])
+  const [registeredPatients, setRegisteredPatients] = useState<Patient[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [stats, setStats] = useState({
+    patientsRegisteredToday: 0,
+    emergencyLogsToday: 0,
+    qrScansToday: 0,
+    followUpsRequired: 0,
+    totalPatients: 0,
   })
 
-  const [newCase, setNewCase] = useState({
-    patientName: "",
-    village: "",
-    caseType: "",
-    symptoms: "",
-    notes: "",
-  })
+  // Mock CHW ID - in real implementation, this would come from user auth
+  const chwId = (user as any)?.chwId || user?.uid || "chw-demo-001"
 
-  const [selectedPatient, setSelectedPatient] = useState("")
-  const [selectedDoctor, setSelectedDoctor] = useState("")
+  // Fetch CHW dashboard data
+  useEffect(() => {
+    const fetchCHWData = async () => {
+      if (!chwId) return
+      
+      setIsLoading(true)
+      try {
+        // Fetch recent CHW logs
+        const logsQuery = query(
+          collection(db, 'chw-logs'),
+          where('chwId', '==', chwId),
+          orderBy('timestamp', 'desc'),
+          limit(10)
+        )
+        
+        const logsSnapshot = await getDocs(logsQuery)
+        const logsList: CHWLog[] = []
+        
+        logsSnapshot.forEach((doc) => {
+          logsList.push({
+            id: doc.id,
+            ...doc.data()
+          } as CHWLog)
+        })
+        
+        setRecentLogs(logsList)
 
-  const villages = ["Riverside Village", "Hillside Community", "Mountain View", "Valley Springs"]
-  const doctors = ["Dr. Sarah Johnson", "Dr. Michael Chen", "Dr. Emily Davis"]
-  const caseTypes = ["Routine Checkup", "Emergency", "Preventive Care", "Follow-up", "Vaccination"]
+        // Fetch emergency logs
+        const emergencyQuery = query(
+          collection(db, 'emergency-logs'),
+          where('chwId', '==', chwId),
+          orderBy('createdAt', 'desc'),
+          limit(5)
+        )
+        
+        const emergencySnapshot = await getDocs(emergencyQuery)
+        const emergencyList: EmergencyLog[] = []
+        
+        emergencySnapshot.forEach((doc) => {
+          emergencyList.push({
+            id: doc.id,
+            ...doc.data()
+          } as EmergencyLog)
+        })
+        
+        setEmergencyLogs(emergencyList)
 
-  const handleRegisterPatient = (e: React.FormEvent) => {
-    e.preventDefault()
-    // TODO: Register patient in Firestore
-    console.log("Registering patient:", newPatient)
-    setNewPatient({ name: "", age: "", village: "", phone: "", condition: "" })
+        // Fetch patients registered by this CHW
+        const patientsQuery = query(
+          collection(db, 'patients'),
+          where('registeredBy', '==', chwId),
+          where('isActive', '==', true),
+          orderBy('createdAt', 'desc'),
+          limit(10)
+        )
+        
+        const patientsSnapshot = await getDocs(patientsQuery)
+        const patientsList: Patient[] = []
+        
+        patientsSnapshot.forEach((doc) => {
+          patientsList.push({
+            id: doc.id,
+            ...doc.data()
+          } as Patient)
+        })
+        
+        setRegisteredPatients(patientsList)
+
+        // Calculate today's stats
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        
+        const patientsToday = logsList.filter(log => 
+          log.action === 'registration' && 
+          log.createdAt.toDate() >= today
+        ).length
+
+        const emergenciesToday = emergencyList.filter(log => 
+          log.createdAt.toDate() >= today
+        ).length
+
+        const qrScansToday = logsList.filter(log => 
+          log.action === 'qr_scan' && 
+          log.createdAt.toDate() >= today
+        ).length
+
+        const followUpsRequired = logsList.filter(log => 
+          log.followUpRequired === true
+        ).length
+
+        setStats({
+          patientsRegisteredToday: patientsToday,
+          emergencyLogsToday: emergenciesToday,
+          qrScansToday: qrScansToday,
+          followUpsRequired: followUpsRequired,
+          totalPatients: patientsList.length,
+        })
+        
+      } catch (error) {
+        console.error('Error fetching CHW data:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchCHWData()
+  }, [chwId])
+
+  // Format date for display
+  const formatDate = (timestamp: any) => {
+    const date = timestamp.toDate()
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
   }
 
-  const handleLogCase = (e: React.FormEvent) => {
-    e.preventDefault()
-    // TODO: Log case in Firestore
-    console.log("Logging case:", newCase)
-    setNewCase({ patientName: "", village: "", caseType: "", symptoms: "", notes: "" })
+  // Get severity badge color
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'critical': return 'destructive'
+      case 'high': return 'default'
+      case 'medium': return 'secondary'
+      case 'low': return 'outline'
+      default: return 'secondary'
+    }
   }
 
-  const handleBookAppointment = (e: React.FormEvent) => {
-    e.preventDefault()
-    // TODO: Book appointment in Firestore
-    console.log("Booking appointment:", { selectedPatient, selectedDoctor })
-    setSelectedPatient("")
-    setSelectedDoctor("")
+  // Get action badge color
+  const getActionColor = (action: string) => {
+    switch (action) {
+      case 'emergency': return 'destructive'
+      case 'registration': return 'default'
+      case 'consultation': return 'secondary'
+      case 'qr_scan': return 'outline'
+      default: return 'secondary'
+    }
   }
 
-  const activeCases = mockCases.filter((c) => c.status !== "completed")
-  const completedCases = mockCases.filter((c) => c.status === "completed")
-  const upcomingAppointments = mockAppointments.filter((a) => a.status === "scheduled" || a.status === "confirmed")
+  // Handle quick action clicks
+  const handleQuickAction = (actionId: string) => {
+    setActiveSection(actionId)
+    const actionTitle = quickActions.find(a => a.id === actionId)?.title
+    announce(`${actionTitle} opened`, 'polite')
+    trackSectionLoad(actionId, true)
+    console.log(`CHW Action: ${actionId}`)
+  }
+
+  // Handle patient registration completion
+  const handleRegistrationComplete = (newPatient: Patient) => {
+    // Add the new patient to the registered patients list
+    setRegisteredPatients(prev => [newPatient, ...prev])
+    
+    // Update stats
+    setStats(prev => ({
+      ...prev,
+      patientsRegisteredToday: prev.patientsRegisteredToday + 1,
+      totalPatients: prev.totalPatients + 1,
+    }))
+    
+    // Close the registration form
+    setActiveSection(null)
+  }
+
+  // Handle QR scan completion
+  const handleQRScanComplete = (patient: Patient | null) => {
+    if (patient) {
+      // Update QR scan stats
+      setStats(prev => ({
+        ...prev,
+        qrScansToday: prev.qrScansToday + 1,
+      }))
+      
+      console.log('QR Scan completed for patient:', patient.name)
+      // In a real implementation, this might navigate to patient records
+      // or open a patient details modal
+    }
+    
+    // Close the scanner
+    setActiveSection(null)
+  }
+
+  // Handle emergency log completion
+  const handleEmergencyLogComplete = (emergencyLog: EmergencyLog) => {
+    // Add the new emergency log to the list
+    setEmergencyLogs(prev => [emergencyLog, ...prev])
+    
+    // Update stats
+    setStats(prev => ({
+      ...prev,
+      emergencyLogsToday: prev.emergencyLogsToday + 1,
+      followUpsRequired: emergencyLog.severity === 'critical' || emergencyLog.severity === 'high' 
+        ? prev.followUpsRequired + 1 
+        : prev.followUpsRequired,
+    }))
+    
+    console.log('Emergency logged:', emergencyLog.severity, emergencyLog.description)
+    
+    // Close the emergency logger
+    setActiveSection(null)
+  }
+
+  // Handle secondary action clicks
+  const handleSecondaryAction = (actionType: string) => {
+    console.log(`CHW Secondary Action: ${actionType}`)
+    // These will be implemented in future tasks or as separate features
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
+      {/* Skip Links for Accessibility */}
+      <SkipLink href="#main-content">Skip to main content</SkipLink>
+      <SkipLink href="#chw-stats">Skip to CHW statistics</SkipLink>
+      <SkipLink href="#quick-actions">Skip to quick actions</SkipLink>
+      <SkipLink href="#recent-activity">Skip to recent activity</SkipLink>
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" role="main" id="main-content">
+      {/* Header Section */}
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-foreground mb-2">Community Health Dashboard</h2>
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          CHW Dashboard
+        </h1>
         <p className="text-muted-foreground">
-          Supporting rural communities with healthcare coordination and patient assistance
+          Welcome back, {user?.name?.split(' ')[0] || 'Community Health Worker'}. 
+          Manage patient care and community health services.
         </p>
       </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="patients">Patients</TabsTrigger>
-            <TabsTrigger value="cases">Cases</TabsTrigger>
-            <TabsTrigger value="appointments">Appointments</TabsTrigger>
-            <TabsTrigger value="outreach">Outreach</TabsTrigger>
-          </TabsList>
+      {/* Quick Stats Overview */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-8" id="chw-stats" role="region" aria-label="CHW statistics overview">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Patients Today</CardTitle>
+            <UserPlus className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{stats.patientsRegisteredToday}</div>
+            <p className="text-xs text-muted-foreground">New registrations</p>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">QR Scans</CardTitle>
+            <QrCode className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.qrScansToday}</div>
+            <p className="text-xs text-muted-foreground">Records accessed</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Emergencies</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{stats.emergencyLogsToday}</div>
+            <p className="text-xs text-muted-foreground">Alerts logged today</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Follow-ups</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{stats.followUpsRequired}</div>
+            <p className="text-xs text-muted-foreground">Pending actions</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalPatients}</div>
+            <p className="text-xs text-muted-foreground">Under your care</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions - Primary CHW Functions */}
+      <div className="mb-8" id="quick-actions" role="region" aria-label="Quick actions for CHW tasks">
+        <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {quickActions.map((action) => {
+            const IconComponent = action.icon
+            return (
+              <Card 
+                key={action.id} 
+                className={`cursor-pointer transition-all duration-200 hover:shadow-lg border-2 ${
+                  activeSection === action.id ? action.color : 'hover:border-primary/20'
+                } ${action.priority === 'critical' ? 'ring-2 ring-red-200' : ''}`}
+                onClick={() => handleQuickAction(action.id)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-3 rounded-lg ${action.color}`}>
+                      <IconComponent className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-lg flex items-center justify-between">
+                        {action.title}
+                        {action.priority === 'critical' && (
+                          <Badge variant="destructive" className="text-xs">
+                            Critical
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        {action.description}
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{mockPatients.length}</div>
-                  <p className="text-xs text-muted-foreground">Under care</p>
+                <CardContent className="pt-0">
+                  <Button 
+                    variant={action.priority === 'critical' ? 'destructive' : 'outline'} 
+                    className="w-full"
+                    size="sm"
+                  >
+                    {activeSection === action.id ? 'Close' : 'Start'} {action.title}
+                  </Button>
                 </CardContent>
               </Card>
+            )
+          })}
+        </div>
+      </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Active Cases</CardTitle>
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{activeCases.length}</div>
-                  <p className="text-xs text-muted-foreground">Ongoing</p>
-                </CardContent>
-              </Card>
+      {/* Active Section Content */}
+      {activeSection && (
+        <div className="mb-8" role="region" aria-label="Active CHW tool">
+          {activeSection === 'register' ? (
+            <PatientRegistrationWithSuspense
+              chwId={chwId}
+              onRegistrationComplete={handleRegistrationComplete}
+              onClose={() => setActiveSection(null)}
+            />
+          ) : activeSection === 'scan' ? (
+            <QRScannerWithSuspense
+              chwId={chwId}
+              onScanComplete={handleQRScanComplete}
+              onClose={() => setActiveSection(null)}
+            />
+          ) : activeSection === 'emergency' ? (
+            <EmergencyLoggerWithSuspense
+              chwId={chwId}
+              onLogComplete={handleEmergencyLogComplete}
+              onClose={() => setActiveSection(null)}
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {quickActions.find(a => a.id === activeSection)?.title}
+                </CardTitle>
+                <CardDescription>
+                  This functionality will be implemented in the upcoming subtasks.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-muted-foreground">
+                  <div className="mb-4">
+                    {quickActions.find(a => a.id === activeSection)?.icon && (
+                      <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                        {(() => {
+                          const IconComponent = quickActions.find(a => a.id === activeSection)?.icon!
+                          return <IconComponent className="h-8 w-8" />
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-lg font-medium mb-2">Coming Soon</p>
+                  <p className="text-sm mb-4">
+                    This feature will be implemented in future tasks.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveSection(null)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Appointments</CardTitle>
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{upcomingAppointments.length}</div>
-                  <p className="text-xs text-muted-foreground">Scheduled</p>
-                </CardContent>
-              </Card>
+      {/* Secondary Actions and Information */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 mb-8" id="recent-activity" role="region" aria-label="Additional tools and recent activity">
+        {/* Secondary Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Additional Tools</CardTitle>
+            <CardDescription>Other CHW functions and utilities</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {secondaryActions.map((action) => {
+              const IconComponent = action.icon
+              return (
+                <Button 
+                  key={action.id}
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => handleSecondaryAction(action.action)}
+                >
+                  <IconComponent className="h-4 w-4 mr-3" />
+                  <div className="text-left">
+                    <div className="font-medium">{action.title}</div>
+                    <div className="text-xs text-muted-foreground">{action.description}</div>
+                  </div>
+                </Button>
+              )
+            })}
+          </CardContent>
+        </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Villages Served</CardTitle>
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{villages.length}</div>
-                  <p className="text-xs text-muted-foreground">Communities</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Cases</CardTitle>
-                  <CardDescription>Latest patient cases and interventions</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {mockCases.slice(0, 3).map((case_) => (
-                    <div key={case_.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="space-y-1">
-                        <p className="font-medium">{case_.patientName}</p>
-                        <p className="text-sm text-muted-foreground">{case_.caseType}</p>
-                        <div className="flex items-center text-xs text-muted-foreground">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          {case_.village}
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Your latest CHW actions and logs</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                <p className="text-sm text-muted-foreground mt-2">Loading activity...</p>
+              </div>
+            ) : recentLogs.length > 0 ? (
+              <div className="space-y-3">
+                {recentLogs.slice(0, 5).map((log) => (
+                  <div key={log.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Activity className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">
+                          {log.action.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatDate(log.createdAt)}
                         </div>
                       </div>
-                      <Badge
-                        variant={
-                          case_.status === "completed"
-                            ? "default"
-                            : case_.status === "referred"
-                              ? "secondary"
-                              : "outline"
-                        }
-                      >
-                        {case_.status}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={getActionColor(log.action)} className="text-xs">
+                        {log.action}
                       </Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Common tasks and patient assistance</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button className="w-full justify-start bg-transparent" variant="outline">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Register New Patient
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Register New Patient</DialogTitle>
-                        <DialogDescription>Add a new patient to the community health system</DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleRegisterPatient} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="patient-name">Full Name</Label>
-                          <Input
-                            id="patient-name"
-                            value={newPatient.name}
-                            onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="patient-age">Age</Label>
-                            <Input
-                              id="patient-age"
-                              type="number"
-                              value={newPatient.age}
-                              onChange={(e) => setNewPatient({ ...newPatient, age: e.target.value })}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="patient-village">Village</Label>
-                            <Select
-                              value={newPatient.village}
-                              onValueChange={(value) => setNewPatient({ ...newPatient, village: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select village" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {villages.map((village) => (
-                                  <SelectItem key={village} value={village}>
-                                    {village}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="patient-phone">Phone Number</Label>
-                          <Input
-                            id="patient-phone"
-                            value={newPatient.phone}
-                            onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="patient-condition">Medical Condition (Optional)</Label>
-                          <Input
-                            id="patient-condition"
-                            value={newPatient.condition}
-                            onChange={(e) => setNewPatient({ ...newPatient, condition: e.target.value })}
-                          />
-                        </div>
-                        <Button type="submit" className="w-full">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Register Patient
-                        </Button>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button className="w-full justify-start bg-transparent" variant="outline">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Book Appointment
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Book Appointment</DialogTitle>
-                        <DialogDescription>Schedule a consultation for a patient</DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleBookAppointment} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="appointment-patient">Select Patient</Label>
-                          <Select value={selectedPatient} onValueChange={setSelectedPatient} required>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Choose patient" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {mockPatients.map((patient) => (
-                                <SelectItem key={patient.id} value={patient.id}>
-                                  {patient.name} - {patient.village}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="appointment-doctor">Select Doctor</Label>
-                          <Select value={selectedDoctor} onValueChange={setSelectedDoctor} required>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Choose doctor" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {doctors.map((doctor) => (
-                                <SelectItem key={doctor} value={doctor}>
-                                  {doctor}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="appointment-date">Date</Label>
-                            <Input id="appointment-date" type="date" required />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="appointment-time">Time</Label>
-                            <Input id="appointment-time" type="time" required />
-                          </div>
-                        </div>
-                        <Button type="submit" className="w-full">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Book Appointment
-                        </Button>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button className="w-full justify-start bg-transparent" variant="outline">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Log New Case
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Log New Case</DialogTitle>
-                        <DialogDescription>Record a new patient case or intervention</DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleLogCase} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="case-patient">Patient Name</Label>
-                          <Input
-                            id="case-patient"
-                            value={newCase.patientName}
-                            onChange={(e) => setNewCase({ ...newCase, patientName: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="case-village">Village</Label>
-                            <Select
-                              value={newCase.village}
-                              onValueChange={(value) => setNewCase({ ...newCase, village: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select village" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {villages.map((village) => (
-                                  <SelectItem key={village} value={village}>
-                                    {village}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="case-type">Case Type</Label>
-                            <Select
-                              value={newCase.caseType}
-                              onValueChange={(value) => setNewCase({ ...newCase, caseType: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {caseTypes.map((type) => (
-                                  <SelectItem key={type} value={type}>
-                                    {type}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="case-symptoms">Symptoms/Description</Label>
-                          <Textarea
-                            id="case-symptoms"
-                            value={newCase.symptoms}
-                            onChange={(e) => setNewCase({ ...newCase, symptoms: e.target.value })}
-                            rows={3}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="case-notes">Notes/Action Taken</Label>
-                          <Textarea
-                            id="case-notes"
-                            value={newCase.notes}
-                            onChange={(e) => setNewCase({ ...newCase, notes: e.target.value })}
-                            rows={3}
-                          />
-                        </div>
-                        <Button type="submit" className="w-full">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Log Case
-                        </Button>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="patients" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Patient Registry</h3>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Patient
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Register New Patient</DialogTitle>
-                    <DialogDescription>Add a new patient to the community registry</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleRegisterPatient} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-name">Full Name</Label>
-                      <Input
-                        id="reg-name"
-                        value={newPatient.name}
-                        onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-age">Age</Label>
-                        <Input
-                          id="reg-age"
-                          type="number"
-                          value={newPatient.age}
-                          onChange={(e) => setNewPatient({ ...newPatient, age: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-village">Village</Label>
-                        <Select
-                          value={newPatient.village}
-                          onValueChange={(value) => setNewPatient({ ...newPatient, village: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select village" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {villages.map((village) => (
-                              <SelectItem key={village} value={village}>
-                                {village}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-phone">Phone Number</Label>
-                      <Input
-                        id="reg-phone"
-                        value={newPatient.phone}
-                        onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-condition">Medical Condition</Label>
-                      <Input
-                        id="reg-condition"
-                        value={newPatient.condition}
-                        onChange={(e) => setNewPatient({ ...newPatient, condition: e.target.value })}
-                      />
-                    </div>
-                    <Button type="submit" className="w-full">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Register Patient
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {mockPatients.map((patient) => (
-                <Card key={patient.id}>
-                  <CardContent className="pt-6">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-semibold">{patient.name}</h4>
-                          <p className="text-sm text-muted-foreground">ID: {patient.id}</p>
-                        </div>
-                        <Badge variant="outline">Age: {patient.age}</Badge>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center text-sm">
-                          <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span>{patient.village}</span>
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span>{patient.phone}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Last Visit:</span>
-                          <span>{patient.lastVisit}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Condition:</span>
-                          <span>{patient.condition}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex space-x-2 pt-2">
-                        <Button size="sm" variant="outline" className="flex-1 bg-transparent">
-                          <Stethoscope className="h-4 w-4 mr-1" />
-                          Visit
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          <Phone className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="cases" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Case Management</h3>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Log New Case
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Log New Case</DialogTitle>
-                    <DialogDescription>Record a patient case or health intervention</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleLogCase} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="log-patient">Patient Name</Label>
-                      <Input
-                        id="log-patient"
-                        value={newCase.patientName}
-                        onChange={(e) => setNewCase({ ...newCase, patientName: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="log-village">Village</Label>
-                        <Select
-                          value={newCase.village}
-                          onValueChange={(value) => setNewCase({ ...newCase, village: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select village" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {villages.map((village) => (
-                              <SelectItem key={village} value={village}>
-                                {village}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="log-type">Case Type</Label>
-                        <Select
-                          value={newCase.caseType}
-                          onValueChange={(value) => setNewCase({ ...newCase, caseType: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {caseTypes.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="log-symptoms">Symptoms/Description</Label>
-                      <Textarea
-                        id="log-symptoms"
-                        value={newCase.symptoms}
-                        onChange={(e) => setNewCase({ ...newCase, symptoms: e.target.value })}
-                        rows={3}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="log-notes">Notes/Action Taken</Label>
-                      <Textarea
-                        id="log-notes"
-                        value={newCase.notes}
-                        onChange={(e) => setNewCase({ ...newCase, notes: e.target.value })}
-                        rows={3}
-                      />
-                    </div>
-                    <Button type="submit" className="w-full">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Log Case
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <div className="space-y-4">
-              {mockCases.map((case_) => (
-                <Card key={case_.id}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-3">
-                          <h4 className="font-semibold">{case_.patientName}</h4>
-                          <Badge variant="outline">{case_.caseType}</Badge>
-                        </div>
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          {case_.village}
-                          <span className="mx-2">•</span>
-                          <Clock className="h-4 w-4 mr-1" />
-                          {case_.date}
-                        </div>
-                        <p className="text-sm">{case_.symptoms}</p>
-                        {case_.notes && <p className="text-sm text-muted-foreground italic">{case_.notes}</p>}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge
-                          variant={
-                            case_.status === "completed"
-                              ? "default"
-                              : case_.status === "referred"
-                                ? "secondary"
-                                : "outline"
-                          }
-                        >
-                          {case_.status}
+                      {log.severity && (
+                        <Badge variant={getSeverityColor(log.severity)} className="text-xs">
+                          {log.severity}
                         </Badge>
-                        <Button size="sm" variant="outline">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Edit
-                        </Button>
-                      </div>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No recent activity</p>
+                <p className="text-xs">Start using CHW tools to see your activity here</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-          <TabsContent value="appointments" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Appointment Coordination</h3>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Book Appointment
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Book Patient Appointment</DialogTitle>
-                    <DialogDescription>Schedule a consultation for a community member</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleBookAppointment} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="book-patient">Select Patient</Label>
-                      <Select value={selectedPatient} onValueChange={setSelectedPatient} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose patient" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mockPatients.map((patient) => (
-                            <SelectItem key={patient.id} value={patient.id}>
-                              {patient.name} - {patient.village}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+      {/* Emergency Alerts and Patient Summary */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Emergency Alerts */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <span>Emergency Alerts</span>
+            </CardTitle>
+            <CardDescription>Recent emergency situations logged</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {emergencyLogs.length > 0 ? (
+              <div className="space-y-3">
+                {emergencyLogs.slice(0, 3).map((emergency) => (
+                  <div key={emergency.id} className="p-3 border-l-4 border-l-red-500 bg-red-50 rounded-r-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant={getSeverityColor(emergency.severity)} className="text-xs">
+                        {emergency.severity.toUpperCase()}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(emergency.createdAt)}
+                      </span>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="book-doctor">Select Doctor</Label>
-                      <Select value={selectedDoctor} onValueChange={setSelectedDoctor} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose doctor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {doctors.map((doctor) => (
-                            <SelectItem key={doctor} value={doctor}>
-                              {doctor}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <p className="text-sm font-medium mb-1">{emergency.description}</p>
+                    <div className="flex items-center text-xs text-muted-foreground">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      <span>GPS Location Recorded</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="book-date">Date</Label>
-                        <Input id="book-date" type="date" required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="book-time">Time</Label>
-                        <Input id="book-time" type="time" required />
-                      </div>
-                    </div>
-                    <Button type="submit" className="w-full">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Book Appointment
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No emergency alerts</p>
+                <p className="text-xs">Emergency situations will appear here</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-            <div className="space-y-4">
-              {mockAppointments.map((appointment) => (
-                <Card key={appointment.id}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">{appointment.patientName}</h4>
-                        <p className="text-sm text-muted-foreground">with {appointment.doctorName}</p>
-                        <div className="flex items-center space-x-4 text-sm">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-1" />
-                            {appointment.date}
-                          </div>
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-1" />
-                            {appointment.time}
-                          </div>
+        {/* Recent Patients */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Users className="h-5 w-5 text-blue-600" />
+              <span>Recent Patients</span>
+            </CardTitle>
+            <CardDescription>Patients you've recently registered</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {registeredPatients.length > 0 ? (
+              <div className="space-y-3">
+                {registeredPatients.slice(0, 4).map((patient) => (
+                  <div key={patient.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-medium text-blue-600">
+                          {patient.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">{patient.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Age {patient.age} • {patient.gender}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"}>
-                          {appointment.status}
-                        </Badge>
-                        <Button size="sm" variant="outline">
-                          <Phone className="h-4 w-4 mr-2" />
-                          Remind
-                        </Button>
-                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="outreach" className="space-y-6">
-            <h3 className="text-lg font-semibold">Community Outreach</h3>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Village Statistics</CardTitle>
-                  <CardDescription>Health metrics by community</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {villages.map((village) => {
-                    const villagePatients = mockPatients.filter((p) => p.village === village)
-                    const villageCases = mockCases.filter((c) => c.village === village)
-                    return (
-                      <div key={village} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="space-y-1">
-                          <p className="font-medium">{village}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {villagePatients.length} patients • {villageCases.length} cases
-                          </p>
-                        </div>
-                        <Button size="sm" variant="outline">
-                          <MapPin className="h-4 w-4 mr-2" />
-                          Visit
-                        </Button>
-                      </div>
-                    )
-                  })}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Health Alerts</CardTitle>
-                  <CardDescription>Community health notifications</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-3 p-3 border rounded-lg border-orange-200">
-                    <AlertCircle className="h-5 w-5 text-orange-500" />
-                    <div className="flex-1">
-                      <p className="font-medium">Vaccination Drive</p>
-                      <p className="text-sm text-muted-foreground">
-                        Hepatitis B vaccines available at Riverside Village
-                      </p>
+                    <div className="flex items-center space-x-2">
+                      <Button size="sm" variant="outline" className="text-xs">
+                        <QrCode className="h-3 w-3 mr-1" />
+                        QR
+                      </Button>
                     </div>
                   </div>
-
-                  <div className="flex items-center space-x-3 p-3 border rounded-lg border-blue-200">
-                    <AlertCircle className="h-5 w-5 text-blue-500" />
-                    <div className="flex-1">
-                      <p className="font-medium">Health Screening</p>
-                      <p className="text-sm text-muted-foreground">Diabetes screening scheduled for Mountain View</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-3 p-3 border rounded-lg border-green-200">
-                    <AlertCircle className="h-5 w-5 text-green-500" />
-                    <div className="flex-1">
-                      <p className="font-medium">Health Education</p>
-                      <p className="text-sm text-muted-foreground">Hygiene workshop at Hillside Community Center</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-      </Tabs>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No patients registered yet</p>
+                <p className="text-xs">Use "Register Patient" to add new patients</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
+    </>
   )
 }

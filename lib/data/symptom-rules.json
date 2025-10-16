@@ -1,0 +1,222 @@
+{
+  "rules": [
+    {
+      "id": "fever_cough_respiratory",
+      "name": "Respiratory Infection",
+      "description": "Common cold or flu symptoms",
+      "symptoms": ["Fever", "Cough", "Sore throat"],
+      "conditions": [
+        {
+          "type": "any",
+          "symptoms": ["Fever", "Cough", "Sore throat"]
+        }
+      ],
+      "advice": "You may have a respiratory infection like a cold or flu. Rest, stay hydrated, and monitor your symptoms.",
+      "urgency": "low",
+      "recommendedAction": "Home care with rest and fluids. Consider over-the-counter medications for symptom relief.",
+      "followUpDays": 3,
+      "isActive": true,
+      "priority": 1
+    },
+    {
+      "id": "high_fever_severe_symptoms",
+      "name": "Severe Respiratory Illness",
+      "description": "High fever with multiple respiratory symptoms",
+      "symptoms": ["Fever", "Cough", "Shortness of breath", "Chest pain"],
+      "conditions": [
+        {
+          "type": "all",
+          "symptoms": ["Fever", "Shortness of breath"]
+        }
+      ],
+      "advice": "High fever with breathing difficulties requires medical attention. This could indicate a serious respiratory infection.",
+      "urgency": "high",
+      "recommendedAction": "Seek medical attention within 24 hours. Consider visiting urgent care or emergency room if symptoms worsen.",
+      "specialistReferral": "Pulmonologist",
+      "followUpDays": 1,
+      "isActive": true,
+      "priority": 8
+    },
+    {
+      "id": "chest_pain_emergency",
+      "name": "Cardiac Emergency",
+      "description": "Chest pain with concerning symptoms",
+      "symptoms": ["Chest pain", "Shortness of breath", "Dizziness", "Heart palpitations"],
+      "conditions": [
+        {
+          "type": "any",
+          "symptoms": ["Chest pain"]
+        }
+      ],
+      "advice": "Chest pain can be a sign of a heart attack or other serious cardiac condition. Seek immediate emergency care.",
+      "urgency": "emergency",
+      "recommendedAction": "Call emergency services immediately or go to the nearest emergency room.",
+      "specialistReferral": "Cardiologist",
+      "isActive": true,
+      "priority": 10
+    },
+    {
+      "id": "headache_neurological",
+      "name": "Severe Headache",
+      "description": "Headache with neurological symptoms",
+      "symptoms": ["Headache", "Confusion", "Dizziness", "Nausea"],
+      "conditions": [
+        {
+          "type": "all",
+          "symptoms": ["Headache", "Confusion"]
+        }
+      ],
+      "advice": "Severe headache with confusion may indicate a serious neurological condition. Seek immediate medical attention.",
+      "urgency": "emergency",
+      "recommendedAction": "Go to emergency room immediately. This combination of symptoms requires urgent evaluation.",
+      "specialistReferral": "Neurologist",
+      "isActive": true,
+      "priority": 9
+    },
+    {
+      "id": "digestive_mild",
+      "name": "Mild Digestive Issues",
+      "description": "Common digestive symptoms",
+      "symptoms": ["Nausea", "Abdominal pain", "Bloating"],
+      "conditions": [
+        {
+          "type": "any",
+          "symptoms": ["Nausea", "Abdominal pain", "Bloating"]
+        }
+      ],
+      "advice": "You may have mild digestive issues. Try eating bland foods, staying hydrated, and avoiding spicy or fatty foods.",
+      "urgency": "low",
+      "recommendedAction": "Home care with dietary modifications. Consider over-the-counter antacids if needed.",
+      "followUpDays": 2,
+      "isActive": true,
+      "priority": 2
+    },
+    {
+      "id": "severe_abdominal_pain",
+      "name": "Severe Abdominal Pain",
+      "description": "Intense abdominal pain requiring attention",
+      "symptoms": ["Abdominal pain", "Vomiting", "Fever"],
+      "conditions": [
+        {
+          "type": "all",
+          "symptoms": ["Abdominal pain", "Vomiting"]
+        }
+      ],
+      "advice": "Severe abdominal pain with vomiting may indicate appendicitis, gallbladder issues, or other serious conditions.",
+      "urgency": "high",
+      "recommendedAction": "Seek medical attention within 4-6 hours. Do not eat or drink until evaluated by a healthcare provider.",
+      "specialistReferral": "Gastroenterologist",
+      "followUpDays": 1,
+      "isActive": true,
+      "priority": 7
+    },
+    {
+      "id": "joint_pain_inflammation",
+      "name": "Joint Pain and Inflammation",
+      "description": "Musculoskeletal pain and stiffness",
+      "symptoms": ["Joint pain", "Stiffness", "Swelling", "Muscle pain"],
+      "conditions": [
+        {
+          "type": "count",
+          "count": {
+            "min": 2,
+            "symptoms": ["Joint pain", "Stiffness", "Swelling", "Muscle pain"]
+          }
+        }
+      ],
+      "advice": "Multiple joint symptoms may indicate arthritis or other inflammatory conditions. Rest, ice, and anti-inflammatory medications may help.",
+      "urgency": "medium",
+      "recommendedAction": "Schedule appointment with primary care physician within 1-2 weeks. Consider physical therapy evaluation.",
+      "specialistReferral": "Rheumatologist",
+      "followUpDays": 7,
+      "isActive": true,
+      "priority": 4
+    },
+    {
+      "id": "skin_rash_allergic",
+      "name": "Allergic Skin Reaction",
+      "description": "Skin rash with possible allergic reaction",
+      "symptoms": ["Rash", "Itching", "Swelling"],
+      "conditions": [
+        {
+          "type": "all",
+          "symptoms": ["Rash", "Itching"]
+        }
+      ],
+      "advice": "You may be experiencing an allergic reaction. Avoid known allergens and consider antihistamines.",
+      "urgency": "medium",
+      "recommendedAction": "Monitor symptoms closely. If rash spreads or breathing becomes difficult, seek immediate care.",
+      "followUpDays": 3,
+      "isActive": true,
+      "priority": 5
+    },
+    {
+      "id": "vision_problems",
+      "name": "Vision Problems",
+      "description": "Eye-related symptoms requiring attention",
+      "symptoms": ["Blurred vision", "Eye pain", "Double vision", "Light sensitivity"],
+      "conditions": [
+        {
+          "type": "any",
+          "symptoms": ["Double vision", "Blurred vision"]
+        }
+      ],
+      "advice": "Vision changes can indicate various eye conditions or neurological issues. Schedule an eye examination.",
+      "urgency": "medium",
+      "recommendedAction": "Schedule appointment with eye care professional within 1 week.",
+      "specialistReferral": "Ophthalmologist",
+      "followUpDays": 5,
+      "isActive": true,
+      "priority": 6
+    },
+    {
+      "id": "general_fatigue",
+      "name": "General Fatigue",
+      "description": "Fatigue and weakness symptoms",
+      "symptoms": ["Fatigue", "Weakness", "Loss of appetite"],
+      "conditions": [
+        {
+          "type": "all",
+          "symptoms": ["Fatigue", "Weakness"]
+        }
+      ],
+      "advice": "Persistent fatigue and weakness may indicate various conditions. Ensure adequate rest, nutrition, and hydration.",
+      "urgency": "low",
+      "recommendedAction": "Monitor symptoms for 1 week. If no improvement, schedule appointment with primary care physician.",
+      "followUpDays": 7,
+      "isActive": true,
+      "priority": 3
+    }
+  ],
+  "emergencySymptoms": [
+    "Chest pain",
+    "Shortness of breath",
+    "Confusion",
+    "Seizures",
+    "Fainting",
+    "Severe headache",
+    "High fever with difficulty breathing"
+  ],
+  "urgencyLevels": {
+    "low": {
+      "color": "green",
+      "description": "Monitor symptoms and consider home care",
+      "timeframe": "Monitor for 3-7 days"
+    },
+    "medium": {
+      "color": "yellow",
+      "description": "Schedule medical appointment soon",
+      "timeframe": "See healthcare provider within 1-2 weeks"
+    },
+    "high": {
+      "color": "orange",
+      "description": "Seek medical attention promptly",
+      "timeframe": "See healthcare provider within 24-48 hours"
+    },
+    "emergency": {
+      "color": "red",
+      "description": "Seek immediate emergency care",
+      "timeframe": "Go to emergency room or call emergency services"
+    }
+  }
+}

@@ -12,7 +12,7 @@ import {
   updateDoc,
   doc
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase/config'
+import { getFirebaseFirestore } from '@/lib/firebase'
 import { Appointment } from '@/lib/types/dashboard-models'
 import { queryKeys, cacheUtils } from '@/lib/providers/query-provider'
 
@@ -40,6 +40,7 @@ interface UseAppointmentsReturn {
 
 // Fetch appointments from Firestore
 const fetchAppointments = async (doctorId: string, filters?: any): Promise<Appointment[]> => {
+  const db = await getFirebaseFirestore()
   const appointmentsRef = collection(db, 'appointments')
   let appointmentQuery = query(
     appointmentsRef,
@@ -120,6 +121,7 @@ export function useAppointmentsOptimized({
   // Mutation for updating appointment status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ appointmentId, status }: { appointmentId: string; status: string }) => {
+      const db = await getFirebaseFirestore()
       const appointmentRef = doc(db, 'appointments', appointmentId)
       await updateDoc(appointmentRef, { 
         status,

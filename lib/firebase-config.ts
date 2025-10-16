@@ -35,6 +35,9 @@ export const COLLECTIONS = {
   HEALTH_RECORDS: "health_records",
   SYSTEM_SETTINGS: "system_settings",
   AUDIT_LOG: "audit_log",
+  FCM_TOKENS: "fcm_tokens",
+  NOTIFICATIONS: "notifications",
+  NOTIFICATION_PREFERENCES: "notification_preferences",
 } as const
 
 // Firestore security rules structure
@@ -100,6 +103,21 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == resource.data.user_id;
       allow write: if false; // Only system can write audit logs
     }
+    
+    // FCM tokens - users can manage their own tokens
+    match /fcm_tokens/{tokenId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // Notifications - users can read their own notifications
+    match /notifications/{notificationId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // Notification preferences - users can manage their own preferences
+    match /notification_preferences/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }
 `
@@ -136,6 +154,7 @@ export const REQUIRED_ENV_VARS = [
   "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
   "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
   "NEXT_PUBLIC_FIREBASE_APP_ID",
+  "NEXT_PUBLIC_FIREBASE_VAPID_KEY",
 ] as const
 
 // Validate Firebase configuration

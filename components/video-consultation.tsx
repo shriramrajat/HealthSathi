@@ -6,11 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Video, VideoOff, Mic, MicOff, PhoneOff, Settings, Users, MessageSquare, FileText, Camera, Clock, Pill, Save } from "lucide-react"
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Settings, Users, MessageSquare, FileText, Camera, Clock, Pill, Save, Monitor } from "lucide-react"
 import { ConsultationNotes } from "@/components/dashboard/consultation-notes"
 import { PrescriptionCreator } from "@/components/dashboard/prescription-creator"
 import { Consultation, Patient } from "@/lib/types/dashboard-models"
 import { consultationService, updateConsultationNotes } from "@/lib/services/consultation-service"
+import { jitsiService, JitsiService, JitsiEventHandlers } from "@/lib/services/jitsi-service"
+import { notificationTriggersService } from "@/lib/services/notification-triggers"
 import { toast } from "sonner"
 
 interface VideoConsultationProps {
@@ -40,6 +42,7 @@ export default function VideoConsultation({
   const [isCallActive, setIsCallActive] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [participants, setParticipants] = useState<string[]>([])
+  const [participantCount, setParticipantCount] = useState(0)
   const [chatMessages, setChatMessages] = useState<
     Array<{ id: string; sender: string; message: string; timestamp: Date }>
   >([])
@@ -47,6 +50,21 @@ export default function VideoConsultation({
   const [showChat, setShowChat] = useState(false)
   const [consultationNotes, setConsultationNotes] = useState(consultation?.notes || "")
   const [callDuration, setCallDuration] = useState(0)
+  const [connectionQuality, setConnectionQuality] = useState<'excellent' | 'good' | 'poor' | 'unknown'>('unknown')
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [availableDevices, setAvailableDevices] = useState<{
+    audioInput: any[]
+    audioOutput: any[]
+    videoInput: any[]
+  }>({ audioInput: [], audioOutput: [], videoInput: [] })
+  const [selectedDevices, setSelectedDevices] = useState<{
+    audioInput?: string
+    audioOutput?: string
+    videoInput?: string
+  }>({})
+  const [showSettings, setShowSettings] = useState(false)
+  const [showPostCallSummary, setShowPostCallSummary] = useState(false)
+  const [postCallSummaryData, setPostCallSummaryData] = useState<string>('')
   
   // Enhanced state for consultation features
   const [showNotesPanel, setShowNotesPanel] = useState(userRole === "doctor")
@@ -55,10 +73,10 @@ export default function VideoConsultation({
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
   const [consultationSummary, setConsultationSummary] = useState("")
 
-  const localVideoRef = useRef<HTMLVideoElement>(null)
-  const remoteVideoRef = useRef<HTMLVideoElement>(null)
+  const jitsiContainerRef = useRef<HTMLDivElement>(null)
   const callStartTime = useRef<Date | null>(null)
   const notesAutoSaveRef = useRef<NodeJS.Timeout | null>(null)
+  const jitsiApiRef = useRef<any>(null)
 
   // Enhanced consultation timer with automatic note-taking and duration tracking
   useEffect(() => {
@@ -95,7 +113,7 @@ export default function VideoConsultation({
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
-  // Auto-save consultation notes
+  // Auto-save consultation notes with enhanced functionality
   const autoSaveNotes = useCallback(async (notes: string) => {
     if (!consultation?.id || !autoSaveEnabled || userRole !== "doctor") return
 
@@ -104,13 +122,31 @@ export default function VideoConsultation({
       if (onConsultationUpdate) {
         onConsultationUpdate({ ...consultation, notes })
       }
+      
+      // Show subtle success indicator
+      console.log('Notes auto-saved successfully')
     } catch (error) {
       console.error('Error auto-saving notes:', error)
       toast.error('Failed to save notes automatically')
     }
   }, [consultation, autoSaveEnabled, userRole, onConsultationUpdate])
 
-  // Handle notes change with auto-save
+  // Enhanced auto-save with immediate save for critical events
+  const saveNotesImmediately = useCallback(async (notes: string) => {
+    if (!consultation?.id || userRole !== "doctor") return
+
+    try {
+      await updateConsultationNotes(consultation.id, notes)
+      if (onConsultationUpdate) {
+        onConsultationUpdate({ ...consultation, notes })
+      }
+    } catch (error) {
+      console.error('Error saving notes immediately:', error)
+      toast.error('Failed to save notes')
+    }
+  }, [consultation, userRole, onConsultationUpdate])
+
+  // Handle notes change with enhanced auto-save
   const handleNotesChange = useCallback((notes: string) => {
     setConsultationNotes(notes)
     
@@ -119,13 +155,23 @@ export default function VideoConsultation({
       clearTimeout(notesAutoSaveRef.current)
     }
 
-    // Set new auto-save timeout (3 seconds after user stops typing)
+    // Set new auto-save timeout (2 seconds after user stops typing for better UX)
     notesAutoSaveRef.current = setTimeout(() => {
       autoSaveNotes(notes)
-    }, 3000)
+    }, 2000)
   }, [autoSaveNotes])
 
-  // Enhanced consultation summary generation using consultation service
+  // Manual save function for immediate saves
+  const handleManualSave = useCallback(async () => {
+    if (notesAutoSaveRef.current) {
+      clearTimeout(notesAutoSaveRef.current)
+    }
+    
+    await saveNotesImmediately(consultationNotes)
+    toast.success('Notes saved successfully')
+  }, [saveNotesImmediately, consultationNotes])
+
+  // Enhanced consultation summary generation with real-time data
   const generateConsultationSummary = useCallback(async () => {
     if (!consultation?.id) {
       toast.error('Cannot generate summary: Consultation not found')
@@ -137,36 +183,56 @@ export default function VideoConsultation({
       const summary = await consultationService.generateConsultationSummary(consultation.id)
       setConsultationSummary(summary)
       
-      // Also create a local summary with current session data
-      const localSummary = `LIVE CONSULTATION SUMMARY
-========================
+      // Create comprehensive summary with real-time session data
+      const sessionSummary = `CONSULTATION SUMMARY
+==================
 
-CURRENT SESSION
---------------
-Patient: ${patientName || 'Unknown'}
+CONSULTATION DETAILS
+-------------------
+Consultation ID: ${consultation.id}
+Patient: ${patientName || patient?.name || 'Unknown'}
 Doctor: ${doctorName || 'Unknown'}
 Date: ${new Date().toLocaleDateString()}
 Start Time: ${callStartTime.current?.toLocaleTimeString() || 'Unknown'}
-Current Duration: ${formatDuration(callDuration)}
+End Time: ${isCallActive ? 'Ongoing' : new Date().toLocaleTimeString()}
+Total Duration: ${formatDuration(callDuration)}
 Room ID: ${roomId}
-Status: ${isCallActive ? 'Active' : 'Ended'}
 
-LIVE NOTES
-----------
-${consultationNotes || 'No notes recorded'}
+TECHNICAL SESSION INFO
+---------------------
+Participants Count: ${participantCount}
+Connection Quality: ${connectionQuality}
+Recording Status: ${isRecording ? 'Recorded' : 'Not recorded'}
+Screen Sharing Used: ${isScreenSharing ? 'Yes' : 'No'}
+Final Video Status: ${isVideoEnabled ? 'Enabled' : 'Disabled'}
+Final Audio Status: ${isAudioEnabled ? 'Enabled' : 'Disabled'}
 
-SESSION DETAILS
+CONSULTATION NOTES
+-----------------
+${consultationNotes || 'No notes recorded during this consultation'}
+
+PATIENT CONTEXT
 --------------
-Participants: ${participants.length + 1}
-Recording: ${isRecording ? 'Active' : 'Not recording'}
-Video: ${isVideoEnabled ? 'Enabled' : 'Disabled'}
-Audio: ${isAudioEnabled ? 'Enabled' : 'Disabled'}
+${patient ? `
+Patient ID: ${patient.id}
+Age: ${patient.dateOfBirth ? Math.floor((new Date().getTime() - patient.dateOfBirth.toDate().getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 'N/A'}
+Gender: ${patient.gender || 'N/A'}
+Emergency Contact: ${patient.emergencyContact || 'N/A'}
+Medical History: ${patient.medicalHistory?.length ? patient.medicalHistory.map(h => h.title).join(', ') : 'None recorded'}
+` : 'Patient information not available'}
 
+SYSTEM INFORMATION
+-----------------
 Generated at: ${new Date().toLocaleString()}
+Generated by: NeuraNovaHealth Video Consultation System
+Summary Version: 2.0
 `
       
+      // Combine service summary with session summary
+      const fullSummary = summary ? `${summary}\n\n${sessionSummary}` : sessionSummary
+      
       // Show summary in a downloadable format
-      const blob = new Blob([summary + '\n\n' + localSummary], { type: 'text/plain' })
+      const blob = new Blob([fullSummary], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -176,15 +242,15 @@ Generated at: ${new Date().toLocaleString()}
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       
-      toast.success('Consultation summary generated and downloaded')
-      return summary
+      toast.success('Comprehensive consultation summary generated and downloaded')
+      return fullSummary
     } catch (error) {
       console.error('Error generating consultation summary:', error)
       toast.error('Failed to generate consultation summary')
     }
-  }, [consultation, patientName, doctorName, callDuration, roomId, isCallActive, consultationNotes, participants.length, isRecording, isVideoEnabled, isAudioEnabled])
+  }, [consultation, patientName, doctorName, callDuration, roomId, isCallActive, consultationNotes, participantCount, isRecording, isVideoEnabled, isAudioEnabled, connectionQuality, isScreenSharing, patient])
 
-  // Enhanced recording functionality with consultation service integration
+  // Enhanced recording functionality with Jitsi and consultation service integration
   const toggleRecording = useCallback(async () => {
     if (!consultation?.id) {
       toast.error('Cannot record: Consultation not found')
@@ -193,7 +259,12 @@ Generated at: ${new Date().toLocaleString()}
 
     try {
       if (!isRecording) {
-        // Start recording
+        // Start recording via Jitsi
+        if (jitsiService.isConferenceActive()) {
+          jitsiService.toggleRecording()
+        }
+        
+        // Also start recording in consultation service
         await consultationService.startConsultationRecording(consultation.id)
         setIsRecording(true)
         
@@ -206,7 +277,12 @@ Generated at: ${new Date().toLocaleString()}
         
         toast.success('Recording started')
       } else {
-        // Stop recording
+        // Stop recording via Jitsi
+        if (jitsiService.isConferenceActive()) {
+          jitsiService.toggleRecording()
+        }
+        
+        // Also stop recording in consultation service
         await consultationService.stopConsultationRecording(consultation.id)
         setIsRecording(false)
         
@@ -225,82 +301,336 @@ Generated at: ${new Date().toLocaleString()}
     }
   }, [isRecording, consultation, userRole, autoSaveEnabled, consultationNotes, autoSaveNotes])
 
-  // Cleanup auto-save timeout
+  // Cleanup auto-save timeout and Jitsi
   useEffect(() => {
     return () => {
       if (notesAutoSaveRef.current) {
         clearTimeout(notesAutoSaveRef.current)
       }
+      
+      // Cleanup Jitsi conference on unmount
+      if (jitsiService.isConferenceActive()) {
+        jitsiService.dispose()
+      }
     }
   }, [])
 
   const startCall = async () => {
+    if (!jitsiContainerRef.current) {
+      toast.error('Video container not ready')
+      return
+    }
+
     setIsConnecting(true)
 
-    // Simulate connection delay
-    setTimeout(() => {
-      setIsCallActive(true)
-      setIsConnecting(false)
-      setParticipants([userRole === "patient" ? patientName || "Patient" : doctorName || "Doctor"])
+    try {
+      // Generate room name from roomId
+      const jitsiRoomName = JitsiService.generateRoomName(roomId, patient?.id)
+      
+      // Set up event handlers
+      const eventHandlers: JitsiEventHandlers = {
+        onVideoConferenceJoined: async (event) => {
+          console.log('Conference joined:', event)
+          setIsCallActive(true)
+          setIsConnecting(false)
+          setParticipantCount(jitsiService.getParticipantCount())
+          
+          // Update audio/video states from Jitsi
+          setIsAudioEnabled(!jitsiService.isAudioMuted())
+          setIsVideoEnabled(!jitsiService.isVideoMuted())
+          
+          // Load available devices
+          try {
+            const devices = await jitsiService.getAvailableDevices()
+            setAvailableDevices(devices)
+          } catch (error) {
+            console.error('Error loading devices:', error)
+          }
 
-      // Mock getting user media
-      if (localVideoRef.current) {
-        // In a real implementation, this would be the actual video stream
-        localVideoRef.current.src = "/video-call-placeholder.jpg"
+          // Trigger consultation started notification
+          if (consultation) {
+            try {
+              await notificationTriggersService.triggerConsultationStarted(consultation)
+            } catch (notificationError) {
+              console.warn('Failed to send consultation started notification:', notificationError)
+              // Don't fail the consultation start if notification fails
+            }
+          }
+          
+          toast.success('Successfully joined video consultation')
+        },
+        
+        onVideoConferenceLeft: (event) => {
+          console.log('Conference left:', event)
+          setIsCallActive(false)
+          setParticipantCount(0)
+          onEndCall?.()
+        },
+        
+        onParticipantJoined: (event) => {
+          console.log('Participant joined:', event)
+          setParticipantCount(jitsiService.getParticipantCount())
+          
+          if (userRole === "doctor" && autoSaveEnabled) {
+            const participantName = event.displayName || 'Unknown participant'
+            const joinNote = `📥 ${participantName} joined the consultation at ${new Date().toLocaleTimeString()}`
+            const updatedNotes = consultationNotes + (consultationNotes ? '\n' : '') + joinNote
+            setConsultationNotes(updatedNotes)
+            autoSaveNotes(updatedNotes)
+          }
+        },
+        
+        onParticipantLeft: (event) => {
+          console.log('Participant left:', event)
+          setParticipantCount(jitsiService.getParticipantCount())
+          
+          if (userRole === "doctor" && autoSaveEnabled) {
+            const participantName = event.displayName || 'Unknown participant'
+            const leaveNote = `📤 ${participantName} left the consultation at ${new Date().toLocaleTimeString()}`
+            const updatedNotes = consultationNotes + (consultationNotes ? '\n' : '') + leaveNote
+            setConsultationNotes(updatedNotes)
+            autoSaveNotes(updatedNotes)
+          }
+        },
+        
+        onMicMutedChanged: (event) => {
+          setIsAudioEnabled(!event.muted)
+          
+          if (userRole === "doctor" && autoSaveEnabled) {
+            const audioNote = `🎤 Audio ${event.muted ? 'muted' : 'unmuted'} at ${new Date().toLocaleTimeString()}`
+            const updatedNotes = consultationNotes + (consultationNotes ? '\n' : '') + audioNote
+            setConsultationNotes(updatedNotes)
+            autoSaveNotes(updatedNotes)
+          }
+        },
+        
+        onCameraMutedChanged: (event) => {
+          setIsVideoEnabled(!event.muted)
+          
+          if (userRole === "doctor" && autoSaveEnabled) {
+            const videoNote = `📹 Video ${event.muted ? 'disabled' : 'enabled'} at ${new Date().toLocaleTimeString()}`
+            const updatedNotes = consultationNotes + (consultationNotes ? '\n' : '') + videoNote
+            setConsultationNotes(updatedNotes)
+            autoSaveNotes(updatedNotes)
+          }
+        },
+        
+        onScreenSharingStatusChanged: (event) => {
+          setIsScreenSharing(event.on)
+          
+          if (userRole === "doctor" && autoSaveEnabled) {
+            const screenNote = `🖥️ Screen sharing ${event.on ? 'started' : 'stopped'} at ${new Date().toLocaleTimeString()}`
+            const updatedNotes = consultationNotes + (consultationNotes ? '\n' : '') + screenNote
+            setConsultationNotes(updatedNotes)
+            autoSaveNotes(updatedNotes)
+          }
+        },
+        
+        onIncomingMessage: (event) => {
+          const message = {
+            id: Date.now().toString(),
+            sender: event.from || 'Unknown',
+            message: event.message,
+            timestamp: new Date(),
+          }
+          setChatMessages(prev => [...prev, message])
+        },
+        
+        onConnectionStatusChanged: (event) => {
+          // Update connection quality based on Jitsi's connection status
+          if (event.connectionQuality) {
+            const quality = event.connectionQuality
+            if (quality >= 80) setConnectionQuality('excellent')
+            else if (quality >= 60) setConnectionQuality('good')
+            else setConnectionQuality('poor')
+          }
+        },
+        
+        onRecordingStatusChanged: (event) => {
+          setIsRecording(event.on)
+          if (userRole === "doctor" && autoSaveEnabled) {
+            const recordingNote = `🔴 Recording ${event.on ? 'started' : 'stopped'} at ${new Date().toLocaleTimeString()}`
+            const updatedNotes = consultationNotes + (consultationNotes ? '\n' : '') + recordingNote
+            setConsultationNotes(updatedNotes)
+            autoSaveNotes(updatedNotes)
+          }
+        },
+        
+        onError: (event) => {
+          console.error('Jitsi error:', event)
+          toast.error(`Video call error: ${event.error?.message || 'Unknown error'}`)
+          setIsConnecting(false)
+        }
       }
-    }, 2000)
+
+      // Initialize Jitsi conference
+      const api = await jitsiService.initializeConference({
+        roomName: jitsiRoomName,
+        width: '100%',
+        height: '100%',
+        parentNode: jitsiContainerRef.current,
+        userInfo: {
+          displayName: userRole === "patient" ? patientName : doctorName,
+          email: undefined // Could be added from user profile
+        },
+        configOverwrite: {
+          startWithAudioMuted: !isAudioEnabled,
+          startWithVideoMuted: !isVideoEnabled,
+          enableWelcomePage: false,
+          prejoinPageEnabled: false,
+        }
+      }, eventHandlers)
+
+      jitsiApiRef.current = api
+      
+    } catch (error) {
+      console.error('Error starting video call:', error)
+      toast.error('Failed to start video call. Please try again.')
+      setIsConnecting(false)
+    }
   }
 
   const endCall = useCallback(async () => {
-    // Generate final consultation summary
-    const summary = generateConsultationSummary()
-    
     // Add end consultation note for doctors
     if (userRole === "doctor" && consultation && autoSaveEnabled) {
-      const endNote = `\nConsultation ended at ${new Date().toLocaleTimeString()}\nTotal duration: ${formatDuration(callDuration)}`
+      const endNote = `\n📋 Consultation ended at ${new Date().toLocaleTimeString()}\n⏱️ Total duration: ${formatDuration(callDuration)}\n✅ Session completed successfully`
       const finalNotes = consultationNotes + endNote
       setConsultationNotes(finalNotes)
       
-      // Save final notes
+      // Save final notes immediately
       try {
-        await autoSaveNotes(finalNotes)
+        await saveNotesImmediately(finalNotes)
       } catch (error) {
         console.error('Error saving final notes:', error)
       }
     }
+
+    // Trigger consultation ended notification
+    if (consultation) {
+      try {
+        // Update consultation with final notes and duration
+        const updatedConsultation = {
+          ...consultation,
+          notes: consultationNotes,
+          duration: callDuration,
+          endTime: new Date()
+        }
+        await notificationTriggersService.triggerConsultationEnded(updatedConsultation)
+      } catch (notificationError) {
+        console.warn('Failed to send consultation ended notification:', notificationError)
+        // Don't fail the consultation end if notification fails
+      }
+    }
     
+    // Generate final consultation summary
+    try {
+      const summary = await generateConsultationSummary()
+      if (summary && userRole === "doctor") {
+        setPostCallSummaryData(summary)
+        setShowPostCallSummary(true)
+      }
+    } catch (error) {
+      console.error('Error generating post-call summary:', error)
+    }
+    
+    // Properly dispose of Jitsi conference
+    if (jitsiService.isConferenceActive()) {
+      jitsiService.hangUp()
+      // Small delay to allow hangup to complete
+      setTimeout(() => {
+        jitsiService.dispose()
+      }, 1000)
+    }
+    
+    // Reset all states
+    jitsiApiRef.current = null
     setIsCallActive(false)
     setIsConnecting(false)
+    setParticipantCount(0)
     callStartTime.current = null
     setCallDuration(0)
+    setIsScreenSharing(false)
+    setConnectionQuality('unknown')
+    setShowSettings(false)
+    setAvailableDevices({ audioInput: [], audioOutput: [], videoInput: [] })
+    setSelectedDevices({})
     
-    // Show prescription dialog for doctors after consultation
-    if (userRole === "doctor" && patient) {
+    // Show prescription dialog for doctors after consultation (if not showing summary)
+    if (userRole === "doctor" && patient && !showPostCallSummary) {
       setShowPrescriptionDialog(true)
-    } else {
+    } else if (userRole === "patient") {
       onEndCall?.()
     }
-  }, [generateConsultationSummary, userRole, consultation, autoSaveEnabled, callDuration, consultationNotes, autoSaveNotes, patient, onEndCall])
+  }, [userRole, consultation, autoSaveEnabled, callDuration, consultationNotes, saveNotesImmediately, generateConsultationSummary, patient, showPostCallSummary, onEndCall])
 
   const toggleVideo = () => {
-    setIsVideoEnabled(!isVideoEnabled)
-    // In real implementation, this would control the video track
+    if (isCallActive && jitsiService.isConferenceActive()) {
+      jitsiService.toggleVideo()
+      // State will be updated via onCameraMutedChanged event
+    } else {
+      setIsVideoEnabled(!isVideoEnabled)
+    }
   }
 
   const toggleAudio = () => {
-    setIsAudioEnabled(!isAudioEnabled)
-    // In real implementation, this would control the audio track
+    if (isCallActive && jitsiService.isConferenceActive()) {
+      jitsiService.toggleAudio()
+      // State will be updated via onMicMutedChanged event
+    } else {
+      setIsAudioEnabled(!isAudioEnabled)
+    }
+  }
+
+  const toggleScreenShare = () => {
+    if (isCallActive && jitsiService.isConferenceActive()) {
+      jitsiService.toggleScreenShare()
+      // State will be updated via onScreenSharingStatusChanged event
+    }
+  }
+
+  const handleDeviceChange = (deviceType: 'audioInput' | 'audioOutput' | 'videoInput', deviceId: string) => {
+    if (!isCallActive || !jitsiService.isConferenceActive()) return
+
+    try {
+      switch (deviceType) {
+        case 'audioInput':
+          jitsiService.setAudioInputDevice(deviceId)
+          break
+        case 'audioOutput':
+          jitsiService.setAudioOutputDevice(deviceId)
+          break
+        case 'videoInput':
+          jitsiService.setVideoInputDevice(deviceId)
+          break
+      }
+      
+      setSelectedDevices(prev => ({
+        ...prev,
+        [deviceType]: deviceId
+      }))
+      
+      toast.success(`${deviceType} device changed successfully`)
+    } catch (error) {
+      console.error(`Error changing ${deviceType} device:`, error)
+      toast.error(`Failed to change ${deviceType} device`)
+    }
   }
 
   const sendMessage = () => {
     if (newMessage.trim()) {
-      const message = {
-        id: Date.now().toString(),
-        sender: userRole === "patient" ? patientName || "Patient" : doctorName || "Doctor",
-        message: newMessage,
-        timestamp: new Date(),
+      if (isCallActive && jitsiService.isConferenceActive()) {
+        // Send message via Jitsi chat
+        jitsiService.sendChatMessage(newMessage)
+      } else {
+        // Fallback to local chat
+        const message = {
+          id: Date.now().toString(),
+          sender: userRole === "patient" ? patientName || "Patient" : doctorName || "Doctor",
+          message: newMessage,
+          timestamp: new Date(),
+        }
+        setChatMessages([...chatMessages, message])
       }
-      setChatMessages([...chatMessages, message])
       setNewMessage("")
     }
   }
@@ -386,8 +716,13 @@ Generated at: ${new Date().toLocaleString()}
             <div className="flex items-center space-x-2">
               <Badge variant="outline">
                 <Users className="h-3 w-3 mr-1" />
-                {participants.length + 1}
+                {participantCount}
               </Badge>
+              {connectionQuality !== 'unknown' && (
+                <Badge variant={connectionQuality === 'excellent' ? 'default' : connectionQuality === 'good' ? 'secondary' : 'destructive'}>
+                  {connectionQuality}
+                </Badge>
+              )}
             </div>
           </div>
         </CardContent>
@@ -396,46 +731,52 @@ Generated at: ${new Date().toLocaleString()}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Video Area */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Remote Video */}
+          {/* Jitsi Video Container */}
           <Card className="relative">
             <CardContent className="p-0">
-              <div className="aspect-video bg-gray-900 rounded-lg relative overflow-hidden">
-                <video ref={remoteVideoRef} className="w-full h-full object-cover" autoPlay playsInline />
-                <div className="absolute bottom-4 left-4">
-                  <Badge variant="secondary">{userRole === "patient" ? doctorName : patientName}</Badge>
-                </div>
-                {/* Placeholder for remote video */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium">{userRole === "patient" ? doctorName : patientName}</p>
+              <div 
+                ref={jitsiContainerRef}
+                className="aspect-video bg-gray-900 rounded-lg relative overflow-hidden"
+                style={{ minHeight: '400px' }}
+              >
+                {!isCallActive && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center text-white">
+                      <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg font-medium">
+                        {isConnecting ? 'Connecting...' : 'Video will appear here'}
+                      </p>
+                      {isConnecting && (
+                        <div className="mt-4">
+                          <div className="w-8 h-8 mx-auto border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
+                
+                {/* Connection status overlay */}
+                {isCallActive && (
+                  <div className="absolute top-4 left-4 z-10">
+                    <Badge variant="secondary" className="bg-green-100 text-green-800">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                      Connected
+                    </Badge>
+                  </div>
+                )}
+                
+                {/* Screen sharing indicator */}
+                {isScreenSharing && (
+                  <div className="absolute top-4 right-4 z-10">
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                      <Monitor className="h-3 w-3 mr-1" />
+                      Screen Sharing
+                    </Badge>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
-
-          {/* Local Video (Picture-in-Picture) */}
-          <div className="relative">
-            <Card className="absolute bottom-4 right-4 w-48 z-10">
-              <CardContent className="p-0">
-                <div className="aspect-video bg-gray-800 rounded-lg relative overflow-hidden">
-                  <video ref={localVideoRef} className="w-full h-full object-cover" autoPlay playsInline muted />
-                  <div className="absolute bottom-2 left-2">
-                    <Badge variant="secondary" className="text-xs">
-                      You
-                    </Badge>
-                  </div>
-                  {/* Placeholder for local video */}
-                  {!isVideoEnabled && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
-                      <VideoOff className="h-8 w-8 text-white opacity-50" />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Call Controls */}
           <Card>
@@ -457,6 +798,16 @@ Generated at: ${new Date().toLocaleString()}
                   className="rounded-full w-12 h-12 p-0"
                 >
                   {isVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                </Button>
+
+                <Button
+                  onClick={toggleScreenShare}
+                  variant={isScreenSharing ? "default" : "outline"}
+                  size="lg"
+                  className="rounded-full w-12 h-12 p-0"
+                  disabled={!isCallActive}
+                >
+                  <Monitor className="h-5 w-5" />
                 </Button>
 
                 <Button
@@ -491,7 +842,13 @@ Generated at: ${new Date().toLocaleString()}
                   </>
                 )}
 
-                <Button variant="outline" size="lg" className="rounded-full w-12 h-12 p-0 bg-transparent">
+                <Button 
+                  onClick={() => setShowSettings(!showSettings)}
+                  variant={showSettings ? "default" : "outline"} 
+                  size="lg" 
+                  className="rounded-full w-12 h-12 p-0"
+                  disabled={!isCallActive}
+                >
                   <Settings className="h-5 w-5" />
                 </Button>
 
@@ -505,6 +862,87 @@ Generated at: ${new Date().toLocaleString()}
 
         {/* Side Panel */}
         <div className="space-y-4">
+          {/* Device Settings */}
+          {showSettings && isCallActive && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Device Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Audio Input */}
+                {availableDevices.audioInput.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">Microphone</label>
+                    <select
+                      value={selectedDevices.audioInput || ''}
+                      onChange={(e) => handleDeviceChange('audioInput', e.target.value)}
+                      className="w-full text-xs p-2 border rounded"
+                    >
+                      <option value="">Default</option>
+                      {availableDevices.audioInput.map((device) => (
+                        <option key={device.deviceId} value={device.deviceId}>
+                          {device.label || `Microphone ${device.deviceId.substring(0, 8)}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Audio Output */}
+                {availableDevices.audioOutput.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">Speaker</label>
+                    <select
+                      value={selectedDevices.audioOutput || ''}
+                      onChange={(e) => handleDeviceChange('audioOutput', e.target.value)}
+                      className="w-full text-xs p-2 border rounded"
+                    >
+                      <option value="">Default</option>
+                      {availableDevices.audioOutput.map((device) => (
+                        <option key={device.deviceId} value={device.deviceId}>
+                          {device.label || `Speaker ${device.deviceId.substring(0, 8)}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Video Input */}
+                {availableDevices.videoInput.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">Camera</label>
+                    <select
+                      value={selectedDevices.videoInput || ''}
+                      onChange={(e) => handleDeviceChange('videoInput', e.target.value)}
+                      className="w-full text-xs p-2 border rounded"
+                    >
+                      <option value="">Default</option>
+                      {availableDevices.videoInput.map((device) => (
+                        <option key={device.deviceId} value={device.deviceId}>
+                          {device.label || `Camera ${device.deviceId.substring(0, 8)}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Connection Quality */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">Connection Quality</label>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs">Quality:</span>
+                    <Badge variant={
+                      connectionQuality === 'excellent' ? 'default' : 
+                      connectionQuality === 'good' ? 'secondary' : 
+                      connectionQuality === 'poor' ? 'destructive' : 'outline'
+                    }>
+                      {connectionQuality}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {/* Chat */}
           {showChat && (
             <Card>
@@ -553,8 +991,18 @@ Generated at: ${new Date().toLocaleString()}
                         size="sm"
                         onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
                         className="h-6 w-6 p-0"
+                        title="Toggle auto-save"
                       >
                         <Save className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleManualSave}
+                        className="h-6 w-6 p-0"
+                        title="Save now"
+                      >
+                        <Save className="h-3 w-3 text-green-600" />
                       </Button>
                     </div>
                   </div>
@@ -569,7 +1017,15 @@ Generated at: ${new Date().toLocaleString()}
                   />
                   <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
                     <span>{consultationNotes.length} characters</span>
-                    <span>Auto-saves every 3 seconds</span>
+                    <span>{autoSaveEnabled ? 'Auto-saves every 2 seconds' : 'Manual save only'}</span>
+                  </div>
+                  
+                  {/* Live event indicators */}
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                      <span>{isCallActive ? 'Live consultation - events auto-logged' : 'Consultation ended'}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -630,7 +1086,7 @@ Generated at: ${new Date().toLocaleString()}
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Participants:</span>
-                <span>{participants.length + 1}</span>
+                <span>{participantCount}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Quality:</span>
@@ -729,6 +1185,80 @@ Generated at: ${new Date().toLocaleString()}
           )}
         </div>
       </div>
+
+      {/* Post-Call Summary Dialog */}
+      {showPostCallSummary && userRole === "doctor" && (
+        <Dialog open={showPostCallSummary} onOpenChange={setShowPostCallSummary}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Consultation Summary</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-muted p-4 rounded-lg">
+                <h4 className="font-medium mb-2">Session Completed Successfully</h4>
+                <p className="text-sm text-muted-foreground">
+                  Your consultation with {patientName} has ended. The summary has been automatically generated and saved.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h4 className="font-medium">Quick Stats</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex justify-between">
+                    <span>Duration:</span>
+                    <span className="font-medium">{formatDuration(callDuration)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Participants:</span>
+                    <span className="font-medium">{participantCount}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Recording:</span>
+                    <span className="font-medium">{isRecording ? 'Yes' : 'No'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Notes Length:</span>
+                    <span className="font-medium">{consultationNotes.length} chars</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setShowPostCallSummary(false)
+                    if (patient) {
+                      setShowPrescriptionDialog(true)
+                    } else {
+                      onEndCall?.()
+                    }
+                  }}
+                  className="flex-1"
+                >
+                  {patient ? 'Create Prescription' : 'Close'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    generateConsultationSummary()
+                  }}
+                >
+                  Download Summary
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowPostCallSummary(false)
+                    onEndCall?.()
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Post-Consultation Prescription Dialog */}
       <Dialog open={showPrescriptionDialog} onOpenChange={setShowPrescriptionDialog}>
