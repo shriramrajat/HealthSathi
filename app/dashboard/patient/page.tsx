@@ -31,43 +31,46 @@ import {
 import type { Appointment } from "@/lib/types/healthcare-models"
 import { useRealTimeAppointments, useRealTimePrescriptions, useNetworkStatus } from "@/hooks/use-real-time-sync"
 import { SyncStatusIndicator } from "@/components/providers/real-time-sync-provider"
-
-// Dashboard section navigation
-const dashboardSections = [
-  {
-    id: "symptoms",
-    title: "Check Symptoms",
-    description: "AI-powered symptom checker for preliminary health advice",
-    icon: Thermometer,
-    color: "bg-red-50 text-red-600 border-red-200",
-  },
-  {
-    id: "appointments",
-    title: "Book Appointment",
-    description: "Schedule consultations with healthcare providers",
-    icon: Calendar,
-    color: "bg-blue-50 text-blue-600 border-blue-200",
-  },
-  {
-    id: "prescriptions",
-    title: "My Prescriptions",
-    description: "View and manage your prescriptions",
-    icon: FileText,
-    color: "bg-green-50 text-green-600 border-green-200",
-  },
-  {
-    id: "pharmacy",
-    title: "Nearby Pharmacies",
-    description: "Find pharmacies and check medicine availability",
-    icon: MapPin,
-    color: "bg-purple-50 text-purple-600 border-purple-200",
-  },
-]
+import { useTranslations } from "next-intl"
 
 export default function PatientDashboard() {
   const { user } = useAuth()
   const [activeSection, setActiveSection] = useState<string | null>(null)
   const [showBookingForm, setShowBookingForm] = useState(false)
+  const t = useTranslations('dashboard.patient')
+  const tCommon = useTranslations('common')
+  
+  // Dashboard section navigation
+  const dashboardSections = [
+    {
+      id: "symptoms",
+      title: t('sections.checkSymptoms'),
+      description: t('sections.checkSymptomsDesc'),
+      icon: Thermometer,
+      color: "bg-red-50 text-red-600 border-red-200",
+    },
+    {
+      id: "appointments",
+      title: t('sections.bookAppointment'),
+      description: t('sections.bookAppointmentDesc'),
+      icon: Calendar,
+      color: "bg-blue-50 text-blue-600 border-blue-200",
+    },
+    {
+      id: "prescriptions",
+      title: t('sections.myPrescriptions'),
+      description: t('sections.myPrescriptionsDesc'),
+      icon: FileText,
+      color: "bg-green-50 text-green-600 border-green-200",
+    },
+    {
+      id: "pharmacy",
+      title: t('sections.nearbyPharmacies'),
+      description: t('sections.nearbyPharmaciesDesc'),
+      icon: MapPin,
+      color: "bg-purple-50 text-purple-600 border-purple-200",
+    },
+  ]
   
   // Performance monitoring
   const {
@@ -112,7 +115,7 @@ export default function PatientDashboard() {
     // Real-time sync will automatically update the appointments list
     setShowBookingForm(false)
     setActiveSection(null)
-    announce('Appointment booked successfully', 'polite')
+    announce(t('accessibility.appointmentBooked'), 'polite')
   }
 
   // Handle section activation with accessibility
@@ -122,10 +125,10 @@ export default function PatientDashboard() {
     
     if (newActiveSection) {
       const sectionTitle = dashboardSections.find(s => s.id === sectionId)?.title
-      announce(`${sectionTitle} section opened`, 'polite')
+      announce(`${sectionTitle} ${t('accessibility.sectionOpened')}`, 'polite')
       trackSectionLoad(sectionId, true)
     } else {
-      announce('Section closed', 'polite')
+      announce(t('accessibility.sectionClosed'), 'polite')
     }
   }
 
@@ -146,9 +149,9 @@ export default function PatientDashboard() {
   return (
     <>
       {/* Skip Links for Accessibility */}
-      <SkipLink href="#main-content">Skip to main content</SkipLink>
-      <SkipLink href="#quick-actions">Skip to quick actions</SkipLink>
-      <SkipLink href="#dashboard-sections">Skip to dashboard sections</SkipLink>
+      <SkipLink href="#main-content">{t('skipLinks.mainContent')}</SkipLink>
+      <SkipLink href="#quick-actions">{t('skipLinks.quickActions')}</SkipLink>
+      <SkipLink href="#dashboard-sections">{t('skipLinks.dashboardSections')}</SkipLink>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" role="main" id="main-content">
       {/* Header Section */}
@@ -156,10 +159,10 @@ export default function PatientDashboard() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              Welcome back, {user?.name?.split(' ')[0] || 'Patient'}
+              {t('welcome')}, {user?.name?.split(' ')[0] || t('title')}
             </h1>
             <p className="text-muted-foreground">
-              Manage your health and connect with healthcare providers
+              {t('welcomeMessage')}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -167,7 +170,7 @@ export default function PatientDashboard() {
             {!isOnline && (
               <Badge variant="destructive" className="flex items-center gap-1">
                 <WifiOff className="h-3 w-3" />
-                Offline Mode
+                {t('offlineMode')}
               </Badge>
             )}
             {(appointmentsLastUpdate || prescriptionsLastUpdate) && (
@@ -178,7 +181,7 @@ export default function PatientDashboard() {
                 className="flex items-center gap-2"
               >
                 <RefreshCw className="h-4 w-4" />
-                Refresh
+                {tCommon('buttons.refresh')}
               </Button>
             )}
           </div>
@@ -189,7 +192,7 @@ export default function PatientDashboard() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Next Appointment</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.nextAppointment')}</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -199,13 +202,13 @@ export default function PatientDashboard() {
                   {formatAppointmentDate(nextAppointment).date}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {nextAppointment.doctorName} at {formatAppointmentDate(nextAppointment).time}
+                  {nextAppointment.doctorName} {t('stats.at')} {formatAppointmentDate(nextAppointment).time}
                 </p>
               </>
             ) : (
               <>
-                <div className="text-2xl font-bold">None</div>
-                <p className="text-xs text-muted-foreground">No upcoming appointments</p>
+                <div className="text-2xl font-bold">{t('stats.none')}</div>
+                <p className="text-xs text-muted-foreground">{t('stats.noUpcoming')}</p>
               </>
             )}
           </CardContent>
@@ -213,40 +216,40 @@ export default function PatientDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Prescriptions</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.activePrescriptions')}</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{prescriptionCount}</div>
-            <p className="text-xs text-muted-foreground">Current medications</p>
+            <p className="text-xs text-muted-foreground">{t('stats.currentMedications')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Health Score</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.healthScore')}</CardTitle>
             <Heart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Good</div>
-            <p className="text-xs text-muted-foreground">Based on recent checkups</p>
+            <div className="text-2xl font-bold">{t('stats.good')}</div>
+            <p className="text-xs text-muted-foreground">{t('stats.basedOnCheckups')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">QR ID</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.qrId')}</CardTitle>
             <QrCode className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-lg font-mono">{user?.qrId || 'QR-DEMO123'}</div>
-            <p className="text-xs text-muted-foreground">Your patient identifier</p>
+            <p className="text-xs text-muted-foreground">{t('stats.yourIdentifier')}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Dashboard Sections */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 mb-8" id="dashboard-sections" role="region" aria-label="Dashboard sections">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 mb-8" id="dashboard-sections" role="region" aria-label={t('accessibility.dashboardSections')}>
         {dashboardSections.map((section) => {
           const IconComponent = section.icon
           return (
@@ -289,7 +292,7 @@ export default function PatientDashboard() {
                     setActiveSection(section.id)
                   }}
                 >
-                  {activeSection === section.id ? 'Close' : 'Open'} {section.title}
+                  {activeSection === section.id ? t('sections.close') : t('sections.open')} {section.title}
                 </Button>
               </CardContent>
             </Card>
@@ -315,9 +318,9 @@ export default function PatientDashboard() {
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle>Your Appointments</CardTitle>
+                      <CardTitle>{t('appointmentsList.title')}</CardTitle>
                       <CardDescription>
-                        Manage your scheduled consultations and appointments
+                        {t('appointmentsList.description')}
                       </CardDescription>
                     </div>
                     <Button 
@@ -325,7 +328,7 @@ export default function PatientDashboard() {
                       className="flex items-center space-x-2"
                     >
                       <Plus className="h-4 w-4" />
-                      <span>Book New</span>
+                      <span>{t('appointmentsList.bookNew')}</span>
                     </Button>
                   </div>
                 </CardHeader>
@@ -333,7 +336,7 @@ export default function PatientDashboard() {
                   {isLoadingAppointments ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                      <p className="text-sm text-muted-foreground mt-2">Loading appointments...</p>
+                      <p className="text-sm text-muted-foreground mt-2">{t('appointmentsList.loading')}</p>
                     </div>
                   ) : appointments.length > 0 ? (
                     <div className="space-y-4">
@@ -369,7 +372,7 @@ export default function PatientDashboard() {
                                       ))}
                                       {appointment.symptoms.length > 3 && (
                                         <Badge variant="secondary" className="text-xs">
-                                          +{appointment.symptoms.length - 3} more
+                                          +{appointment.symptoms.length - 3} {t('appointmentsList.more')}
                                         </Badge>
                                       )}
                                     </div>
@@ -388,7 +391,7 @@ export default function PatientDashboard() {
                                   {(appointment.status === 'confirmed' || appointment.status === 'scheduled') && (
                                     <Button size="sm" variant="outline">
                                       <Video className="h-4 w-4 mr-2" />
-                                      Join Call
+                                      {t('appointmentsList.joinCall')}
                                     </Button>
                                   )}
                                 </div>
@@ -401,11 +404,11 @@ export default function PatientDashboard() {
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg font-medium mb-2">No appointments yet</p>
-                      <p className="text-sm mb-4">Book your first appointment to get started</p>
+                      <p className="text-lg font-medium mb-2">{t('appointmentsList.noAppointments')}</p>
+                      <p className="text-sm mb-4">{t('appointmentsList.noAppointmentsDesc')}</p>
                       <Button onClick={() => setShowBookingForm(true)}>
                         <Plus className="h-4 w-4 mr-2" />
-                        Book Appointment
+                        {t('bookAppointment')}
                       </Button>
                     </div>
                   )}
@@ -421,7 +424,7 @@ export default function PatientDashboard() {
               patientId={user?.uid || ''}
               onComplete={(result) => {
                 console.log('Symptom check completed:', result)
-                announce('Symptom check completed', 'polite')
+                announce(t('accessibility.symptomCheckCompleted'), 'polite')
                 setActiveSection(null)
               }}
               onCancel={() => setActiveSection(null)}
@@ -434,7 +437,7 @@ export default function PatientDashboard() {
                   {dashboardSections.find(s => s.id === activeSection)?.title}
                 </CardTitle>
                 <CardDescription>
-                  Feature coming soon - This functionality will be implemented in upcoming tasks.
+                  {t('sections.comingSoonDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -449,9 +452,9 @@ export default function PatientDashboard() {
                       </div>
                     )}
                   </div>
-                  <p className="text-lg font-medium mb-2">Coming Soon</p>
+                  <p className="text-lg font-medium mb-2">{t('sections.comingSoon')}</p>
                   <p className="text-sm">
-                    This feature will be implemented in the upcoming tasks according to the implementation plan.
+                    {t('sections.comingSoonDesc')}
                   </p>
                 </div>
               </CardContent>
@@ -461,11 +464,11 @@ export default function PatientDashboard() {
       )}
 
       {/* Quick Actions */}
-      <div className="grid gap-6 md:grid-cols-2" id="quick-actions" role="region" aria-label="Quick actions and symptom history">
+      <div className="grid gap-6 md:grid-cols-2" id="quick-actions" role="region" aria-label={t('accessibility.quickActionsRegion')}>
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common healthcare tasks</CardDescription>
+            <CardTitle>{t('quickActionsSection.title')}</CardTitle>
+            <CardDescription>{t('quickActionsSection.description')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button 
@@ -474,11 +477,11 @@ export default function PatientDashboard() {
               onClick={() => setActiveSection('appointments')}
             >
               <Stethoscope className="h-4 w-4 mr-2" />
-              Book Appointment
+              {t('quickActionsSection.bookAppointment')}
             </Button>
             <Button className="w-full justify-start" variant="outline">
               <Video className="h-4 w-4 mr-2" />
-              Start Video Consultation
+              {t('quickActionsSection.startVideo')}
             </Button>
             <Button 
               className="w-full justify-start" 
@@ -486,7 +489,7 @@ export default function PatientDashboard() {
               onClick={() => setActiveSection('symptoms')}
             >
               <Thermometer className="h-4 w-4 mr-2" />
-              Check Symptoms
+              {t('quickActionsSection.checkSymptoms')}
             </Button>
             <Button 
               className="w-full justify-start" 
@@ -494,7 +497,7 @@ export default function PatientDashboard() {
               onClick={() => setActiveSection('prescriptions')}
             >
               <FileText className="h-4 w-4 mr-2" />
-              View Prescriptions
+              {t('quickActionsSection.viewPrescriptions')}
             </Button>
             <Button 
               className="w-full justify-start" 
@@ -502,15 +505,15 @@ export default function PatientDashboard() {
               onClick={() => setActiveSection('pharmacy')}
             >
               <MapPin className="h-4 w-4 mr-2" />
-              Find Pharmacies
+              {t('quickActionsSection.findPharmacies')}
             </Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Symptom History</CardTitle>
-            <CardDescription>Your recent symptom checker results</CardDescription>
+            <CardTitle>{t('symptomHistory.title')}</CardTitle>
+            <CardDescription>{t('symptomHistory.description')}</CardDescription>
           </CardHeader>
           <CardContent>
             <SymptomHistory

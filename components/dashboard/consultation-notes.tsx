@@ -19,6 +19,7 @@ import {
 import { Consultation } from '@/lib/types/dashboard-models'
 import { updateConsultationNotes } from '@/lib/services/consultation-service'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 
 interface ConsultationNotesProps {
   consultation: Consultation
@@ -55,6 +56,9 @@ export function ConsultationNotes({
   onNotesUpdate,
   className 
 }: ConsultationNotesProps) {
+  const t = useTranslations('consultation.notes')
+  const tCommon = useTranslations('common')
+  
   const [notes, setNotes] = useState(consultation.notes || '')
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
@@ -81,11 +85,11 @@ export function ConsultationNotes({
       setHasUnsavedChanges(false)
       onNotesUpdate?.(notesToSave)
       
-      toast.success('Notes saved successfully')
+      toast.success(t('saved'))
     } catch (error) {
       console.error('Error saving notes:', error)
-      setSaveError(error instanceof Error ? error.message : 'Failed to save notes')
-      toast.error('Failed to save notes')
+      setSaveError(error instanceof Error ? error.message : t('unsavedChanges'))
+      toast.error(tCommon('messages.saveError'))
     } finally {
       setIsSaving(false)
     }
@@ -165,11 +169,11 @@ export function ConsultationNotes({
     const diffMs = now.getTime() - date.getTime()
     const diffMinutes = Math.floor(diffMs / 60000)
     
-    if (diffMinutes < 1) return 'Just now'
-    if (diffMinutes < 60) return `${diffMinutes}m ago`
+    if (diffMinutes < 1) return t('justNow')
+    if (diffMinutes < 60) return `${diffMinutes}m ${t('ago')}`
     
     const diffHours = Math.floor(diffMinutes / 60)
-    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffHours < 24) return `${diffHours}h ${t('ago')}`
     
     return date.toLocaleDateString()
   }
@@ -180,7 +184,7 @@ export function ConsultationNotes({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Consultation Notes
+            {t('title')}
           </CardTitle>
           
           <div className="flex items-center gap-2">
@@ -189,17 +193,17 @@ export function ConsultationNotes({
               {isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
+                  {t('saving')}
                 </>
               ) : hasUnsavedChanges ? (
                 <>
                   <Clock className="h-4 w-4" />
-                  Unsaved changes
+                  {t('unsavedChanges')}
                 </>
               ) : lastSaved ? (
                 <>
                   <CheckCircle className="h-4 w-4 text-green-500" />
-                  Saved {formatLastSaved(lastSaved)}
+                  {t('saved')} {formatLastSaved(lastSaved)}
                 </>
               ) : null}
             </div>
@@ -228,13 +232,13 @@ export function ConsultationNotes({
         {/* Consultation info */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Badge variant={consultation.status === 'active' ? 'default' : 'secondary'}>
-            {consultation.status}
+            {t('status')}
           </Badge>
           {consultation.patientName && (
-            <span>Patient: {consultation.patientName}</span>
+            <span>{t('patient')}: {consultation.patientName}</span>
           )}
           {consultation.startTime && (
-            <span>Started: {consultation.startTime.toDate().toLocaleTimeString()}</span>
+            <span>{t('started')}: {consultation.startTime.toDate().toLocaleTimeString()}</span>
           )}
         </div>
 
@@ -252,7 +256,7 @@ export function ConsultationNotes({
         {showTemplates && (
           <Card className="border-dashed">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Note Templates</CardTitle>
+              <CardTitle className="text-sm">{t('templates.title')}</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -266,7 +270,7 @@ export function ConsultationNotes({
                   >
                     <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
                     <div>
-                      <div className="font-medium">{template.title}</div>
+                      <div className="font-medium">{t(`templates.${template.id}` as any)}</div>
                       <div className="text-xs text-muted-foreground truncate">
                         {template.template.split('\n')[0]}
                       </div>
@@ -284,14 +288,14 @@ export function ConsultationNotes({
             ref={textareaRef}
             value={notes}
             onChange={(e) => handleNotesChange(e.target.value)}
-            placeholder="Enter consultation notes here... Notes will auto-save as you type."
+            placeholder={t('placeholder')}
             className="min-h-[300px] resize-none"
             disabled={isSaving}
           />
           
           <div className="flex justify-between items-center text-xs text-muted-foreground">
-            <span>{notes.length} characters</span>
-            <span>Auto-saves 2 seconds after you stop typing</span>
+            <span>{notes.length} {t('characters')}</span>
+            <span>{t('autoSaveInfo')}</span>
           </div>
         </div>
       </CardContent>

@@ -27,77 +27,80 @@ import {
   QRScannerWithSuspense,
   EmergencyLoggerWithSuspense
 } from "@/components/lazy/lazy-dashboard-components"
-
-// Dashboard section navigation for CHW quick actions
-const quickActions = [
-  {
-    id: "register",
-    title: "Register Patient",
-    description: "Add new patient to the system with QR code generation",
-    icon: UserPlus,
-    color: "bg-blue-50 text-blue-600 border-blue-200",
-    priority: "high",
-  },
-  {
-    id: "scan",
-    title: "Scan QR Code",
-    description: "Scan patient QR code to access health records",
-    icon: QrCode,
-    color: "bg-green-50 text-green-600 border-green-200",
-    priority: "high",
-  },
-  {
-    id: "emergency",
-    title: "Emergency Alert",
-    description: "Log emergency situation with GPS location",
-    icon: AlertTriangle,
-    color: "bg-red-50 text-red-600 border-red-200",
-    priority: "critical",
-  },
-  {
-    id: "consultation",
-    title: "Book Teleconsultation",
-    description: "Schedule video consultation for patients",
-    icon: Video,
-    color: "bg-purple-50 text-purple-600 border-purple-200",
-    priority: "medium",
-  },
-]
-
-// Secondary actions for CHW workflow
-const secondaryActions = [
-  {
-    id: "patients",
-    title: "My Patients",
-    description: "View patients registered by you",
-    icon: Users,
-    action: "view_patients",
-  },
-  {
-    id: "logs",
-    title: "Activity Logs",
-    description: "Review your CHW activity history",
-    icon: FileText,
-    action: "view_logs",
-  },
-  {
-    id: "location",
-    title: "Update Location",
-    description: "Update your current working location",
-    icon: MapPin,
-    action: "update_location",
-  },
-  {
-    id: "schedule",
-    title: "Today's Schedule",
-    description: "View scheduled visits and appointments",
-    icon: Calendar,
-    action: "view_schedule",
-  },
-]
+import { useTranslations } from "next-intl"
 
 export default function CHWDashboard() {
   const { user } = useAuth()
+  const t = useTranslations('dashboard.chw')
+  const tCommon = useTranslations('common')
+  
+  // Dashboard section navigation for CHW quick actions
+  const quickActions = [
+    {
+      id: "register",
+      title: t('quickActions.registerPatient'),
+      description: t('quickActions.registerPatientDesc'),
+      icon: UserPlus,
+      color: "bg-blue-50 text-blue-600 border-blue-200",
+      priority: "high",
+    },
+    {
+      id: "scan",
+      title: t('quickActions.scanQR'),
+      description: t('quickActions.scanQRDesc'),
+      icon: QrCode,
+      color: "bg-green-50 text-green-600 border-green-200",
+      priority: "high",
+    },
+    {
+      id: "emergency",
+      title: t('quickActions.emergencyAlert'),
+      description: t('quickActions.emergencyAlertDesc'),
+      icon: AlertTriangle,
+      color: "bg-red-50 text-red-600 border-red-200",
+      priority: "critical",
+    },
+    {
+      id: "consultation",
+      title: t('quickActions.bookTeleconsultation'),
+      description: t('quickActions.bookTeleconsultationDesc'),
+      icon: Video,
+      color: "bg-purple-50 text-purple-600 border-purple-200",
+      priority: "medium",
+    },
+  ]
+
+  // Secondary actions for CHW workflow
+  const secondaryActions = [
+    {
+      id: "patients",
+      title: t('secondaryActions.myPatients'),
+      description: t('secondaryActions.myPatientsDesc'),
+      icon: Users,
+      action: "view_patients",
+    },
+    {
+      id: "logs",
+      title: t('secondaryActions.activityLogs'),
+      description: t('secondaryActions.activityLogsDesc'),
+      icon: FileText,
+      action: "view_logs",
+    },
+    {
+      id: "location",
+      title: t('secondaryActions.updateLocation'),
+      description: t('secondaryActions.updateLocationDesc'),
+      icon: MapPin,
+      action: "update_location",
+    },
+    {
+      id: "schedule",
+      title: t('secondaryActions.todaySchedule'),
+      description: t('secondaryActions.todayScheduleDesc'),
+      icon: Calendar,
+      action: "view_schedule",
+    },
+  ]
   const [activeSection, setActiveSection] = useState<string | null>(null)
   
   // Performance monitoring

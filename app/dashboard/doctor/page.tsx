@@ -20,6 +20,7 @@ import { useConsultations } from "@/hooks/use-consultations"
 import { useAnalyticsData } from "@/hooks/use-analytics-data"
 import { usePerformanceMonitor, usePerformanceAlerts } from "@/lib/utils/performance-monitor"
 import { useMemoizedProps, usePerformanceMemo } from "@/lib/utils/memoization"
+import { useTranslations } from "next-intl"
 
 // Lazy load heavy components for better performance
 const AnalyticsCharts = lazy(() => import("@/components/dashboard/analytics-charts").then(m => ({ default: m.AnalyticsCharts })))
@@ -121,14 +122,6 @@ const mockPatients = [
   },
 ]
 
-// Loading component for lazy-loaded components
-const ComponentLoader = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex items-center justify-center p-8">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-    <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
-  </div>
-)
-
 export default function DoctorDashboard() {
   const { user } = useAuth()
   const [selectedPatient, setSelectedPatient] = useState<string>("")
@@ -137,6 +130,16 @@ export default function DoctorDashboard() {
   const [consultationNotes, setConsultationNotes] = useState("")
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [activeConsultationId, setActiveConsultationId] = useState<string>("")
+  const t = useTranslations('dashboard.doctor')
+  const tCommon = useTranslations('common')
+
+  // Loading component for lazy-loaded components
+  const ComponentLoader = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex items-center justify-center p-8">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <span className="ml-2 text-sm text-muted-foreground">{t('loading.general')}</span>
+    </div>
+  )
 
   // Performance monitoring
   usePerformanceMonitor('DoctorDashboard')
@@ -298,12 +301,12 @@ export default function DoctorDashboard() {
         <div className="mb-4 sm:mb-6 lg:mb-8">
           <div className="flex items-center justify-between mb-1 sm:mb-2">
             <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
-              Good morning, {user?.email?.split('@')[0] || 'Doctor'}
+              {t('goodMorning')}, {user?.email?.split('@')[0] || t('title')}
             </h2>
             <OfflineIndicator variant="compact" />
           </div>
           <p className="text-sm sm:text-base text-muted-foreground">
-            You have {upcomingAppointments.length} appointments scheduled for today
+            {upcomingAppointments.length} {t('appointmentsScheduled')}
           </p>
         </div>
 
@@ -315,40 +318,40 @@ export default function DoctorDashboard() {
                 value="overview" 
                 className="text-xs sm:text-sm px-2 sm:px-3 py-2 sm:py-1.5 whitespace-nowrap"
               >
-                Overview
+                {t('tabs.overview')}
               </TabsTrigger>
               <TabsTrigger 
                 value="appointments" 
                 className="text-xs sm:text-sm px-2 sm:px-3 py-2 sm:py-1.5 whitespace-nowrap"
               >
-                <span className="hidden sm:inline">Appointments</span>
-                <span className="sm:hidden">Appts</span>
+                <span className="hidden sm:inline">{t('tabs.appointments')}</span>
+                <span className="sm:hidden">{t('tabs.appointmentsShort')}</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="patients" 
                 className="text-xs sm:text-sm px-2 sm:px-3 py-2 sm:py-1.5 whitespace-nowrap"
               >
-                Patients
+                {t('tabs.patients')}
               </TabsTrigger>
               <TabsTrigger 
                 value="prescriptions" 
                 className="text-xs sm:text-sm px-2 sm:px-3 py-2 sm:py-1.5 whitespace-nowrap"
               >
-                <span className="hidden sm:inline">Prescriptions</span>
-                <span className="sm:hidden">Rx</span>
+                <span className="hidden sm:inline">{t('tabs.prescriptions')}</span>
+                <span className="sm:hidden">{t('tabs.prescriptionsShort')}</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="consultations" 
                 className="text-xs sm:text-sm px-2 sm:px-3 py-2 sm:py-1.5 whitespace-nowrap"
               >
-                <span className="hidden sm:inline">Consultations</span>
-                <span className="sm:hidden">Consult</span>
+                <span className="hidden sm:inline">{t('tabs.consultations')}</span>
+                <span className="sm:hidden">{t('tabs.consultationsShort')}</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="analytics" 
                 className="text-xs sm:text-sm px-2 sm:px-3 py-2 sm:py-1.5 whitespace-nowrap"
               >
-                Analytics
+                {t('tabs.analytics')}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -357,15 +360,15 @@ export default function DoctorDashboard() {
             {/* Responsive statistics header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4">
               <div>
-                <h3 className="text-base sm:text-lg font-semibold">Dashboard Statistics</h3>
+                <h3 className="text-base sm:text-lg font-semibold">{t('dashboardStats.title')}</h3>
                 {lastUpdated && (
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    Last updated: {lastUpdated.toLocaleTimeString()}
+                    {t('dashboardStats.lastUpdated')}: {lastUpdated.toLocaleTimeString()}
                     {isAutoRefreshing && (
                       <span className="ml-2 inline-flex items-center">
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-1"></div>
-                        <span className="hidden sm:inline">Auto-refreshing</span>
-                        <span className="sm:hidden">Live</span>
+                        <span className="hidden sm:inline">{t('dashboardStats.autoRefreshing')}</span>
+                        <span className="sm:hidden">{t('dashboardStats.live')}</span>
                       </span>
                     )}
                   </p>
@@ -383,8 +386,8 @@ export default function DoctorDashboard() {
             <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
               <Card className="h-fit">
                 <CardHeader className="pb-3 sm:pb-6">
-                  <CardTitle className="text-base sm:text-lg">Next Appointments</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Upcoming consultations for today</CardDescription>
+                  <CardTitle className="text-base sm:text-lg">{t('nextAppointments.title')}</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">{t('nextAppointments.description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 sm:space-y-4">
                   {upcomingAppointments.slice(0, 3).map((appointment) => (
@@ -395,9 +398,9 @@ export default function DoctorDashboard() {
                       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border rounded-lg"
                     >
                       <div className="space-y-1 flex-1 min-w-0">
-                        <p className="font-medium text-sm sm:text-base truncate">{appointment.patientName || 'Unknown Patient'}</p>
+                        <p className="font-medium text-sm sm:text-base truncate">{appointment.patientName || t('nextAppointments.unknownPatient')}</p>
                         <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-                          {appointment.symptoms.join(', ') || 'No symptoms listed'}
+                          {appointment.symptoms.join(', ') || t('nextAppointments.noSymptoms')}
                         </p>
                         <div className="flex items-center text-xs text-muted-foreground">
                           <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
@@ -421,7 +424,7 @@ export default function DoctorDashboard() {
                           className="flex-1 sm:flex-none"
                         >
                           <Video className="h-4 w-4 sm:mr-0 lg:mr-2" />
-                          <span className="sm:hidden lg:inline ml-2">Video</span>
+                          <span className="sm:hidden lg:inline ml-2">{t('nextAppointments.video')}</span>
                         </TouchButton>
                         {appointment.patientPhone && (
                           <TouchButton 
@@ -431,7 +434,7 @@ export default function DoctorDashboard() {
                             className="flex-1 sm:flex-none"
                           >
                             <Phone className="h-4 w-4 sm:mr-0 lg:mr-2" />
-                            <span className="sm:hidden lg:inline ml-2">Call</span>
+                            <span className="sm:hidden lg:inline ml-2">{t('nextAppointments.call')}</span>
                           </TouchButton>
                         )}
                       </div>
@@ -442,28 +445,28 @@ export default function DoctorDashboard() {
 
               <Card className="h-fit">
                 <CardHeader className="pb-3 sm:pb-6">
-                  <CardTitle className="text-base sm:text-lg">Quick Actions</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Common tasks and tools</CardDescription>
+                  <CardTitle className="text-base sm:text-lg">{t('quickActions.title')}</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">{t('quickActions.description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 sm:space-y-3">
                   <Dialog>
                     <DialogTrigger asChild>
                       <TouchButton className="w-full justify-start bg-transparent text-sm" variant="outline">
                         <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
-                        Create Prescription
+                        {t('quickActions.createPrescription')}
                       </TouchButton>
                     </DialogTrigger>
                     <DialogContent className="w-[95vw] max-w-md mx-auto">
                       <DialogHeader>
-                        <DialogTitle className="text-base sm:text-lg">Create Prescription</DialogTitle>
-                        <DialogDescription className="text-xs sm:text-sm">Upload or write a prescription for a patient</DialogDescription>
+                        <DialogTitle className="text-base sm:text-lg">{t('prescriptionDialog.title')}</DialogTitle>
+                        <DialogDescription className="text-xs sm:text-sm">{t('prescriptionDialog.description')}</DialogDescription>
                       </DialogHeader>
                       <form onSubmit={handlePrescriptionUpload} className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="patient" className="text-sm">Select Patient</Label>
+                          <Label htmlFor="patient" className="text-sm">{t('prescriptionDialog.selectPatient')}</Label>
                           <Select value={selectedPatient} onValueChange={setSelectedPatient} required>
                             <SelectTrigger className="text-sm">
-                              <SelectValue placeholder="Choose a patient" />
+                              <SelectValue placeholder={t('prescriptionDialog.choosePatient')} />
                             </SelectTrigger>
                             <SelectContent>
                               {mockPatients.map((patient) => (
@@ -476,10 +479,10 @@ export default function DoctorDashboard() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="prescription" className="text-sm">Prescription Details</Label>
+                          <Label htmlFor="prescription" className="text-sm">{t('prescriptionDialog.prescriptionDetails')}</Label>
                           <Textarea
                             id="prescription"
-                            placeholder="Enter prescription details..."
+                            placeholder={t('prescriptionDialog.enterDetails')}
                             value={prescriptionText}
                             onChange={(e) => setPrescriptionText(e.target.value)}
                             rows={4}
@@ -488,7 +491,7 @@ export default function DoctorDashboard() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="file" className="text-sm">Upload Prescription File (Optional)</Label>
+                          <Label htmlFor="file" className="text-sm">{t('prescriptionDialog.uploadFile')}</Label>
                           <Input 
                             id="file" 
                             type="file" 
@@ -500,7 +503,7 @@ export default function DoctorDashboard() {
 
                         <Button type="submit" className="w-full text-sm">
                           <Upload className="h-4 w-4 mr-2" />
-                          Create Prescription
+                          {t('prescriptionDialog.createButton')}
                         </Button>
                       </form>
                     </DialogContent>
@@ -508,11 +511,11 @@ export default function DoctorDashboard() {
 
                   <TouchButton className="w-full justify-start bg-transparent text-sm" variant="outline">
                     <Video className="h-4 w-4 mr-2 flex-shrink-0" />
-                    Start Video Consultation
+                    {t('quickActions.startVideo')}
                   </TouchButton>
                   <TouchButton className="w-full justify-start bg-transparent text-sm" variant="outline">
                     <Activity className="h-4 w-4 mr-2 flex-shrink-0" />
-                    View Patient Records
+                    {t('quickActions.viewRecords')}
                   </TouchButton>
                 </CardContent>
               </Card>
@@ -545,7 +548,7 @@ export default function DoctorDashboard() {
           </TabsContent>
 
           <TabsContent value="prescriptions" className="space-y-4 sm:space-y-6">
-            <Suspense fallback={<ComponentLoader>Loading Prescription Manager...</ComponentLoader>}>
+            <Suspense fallback={<ComponentLoader>{t('loading.prescriptionManager')}</ComponentLoader>}>
               <PrescriptionManager
                 doctorId={user?.uid || 'default-doctor-id'}
                 patients={memoizedPatients}
@@ -558,7 +561,7 @@ export default function DoctorDashboard() {
           </TabsContent>
 
           <TabsContent value="consultations" className="space-y-4 sm:space-y-6">
-            <Suspense fallback={<ComponentLoader>Loading Consultation Documentation...</ComponentLoader>}>
+            <Suspense fallback={<ComponentLoader>{t('loading.consultationDocs')}</ComponentLoader>}>
               <ConsultationDocumentation
                 doctorId={user?.uid || 'default-doctor-id'}
                 activeConsultationId={activeConsultationId}
@@ -573,19 +576,19 @@ export default function DoctorDashboard() {
           <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <h3 className="text-base sm:text-lg font-semibold">Practice Analytics</h3>
+                <h3 className="text-base sm:text-lg font-semibold">{t('analytics.title')}</h3>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Insights and trends from your practice data
+                  {t('analytics.description')}
                 </p>
               </div>
               {lastUpdated && (
                 <div className="text-xs sm:text-sm text-muted-foreground">
-                  Data as of: {lastUpdated.toLocaleTimeString()}
+                  {t('analytics.dataAsOf')}: {lastUpdated.toLocaleTimeString()}
                 </div>
               )}
             </div>
 
-            <Suspense fallback={<ComponentLoader>Loading Analytics...</ComponentLoader>}>
+            <Suspense fallback={<ComponentLoader>{t('loading.analytics')}</ComponentLoader>}>
               <AnalyticsCharts
                 data={analyticsData}
                 isLoading={isLoadingAnalytics}

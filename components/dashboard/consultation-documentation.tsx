@@ -17,6 +17,7 @@ import { ConsultationHistory } from './consultation-history'
 import { useConsultationNotes } from '@/hooks/use-consultation-notes'
 import { exportPatientConsultationNotes } from '@/lib/services/consultation-service'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 
 interface ConsultationDocumentationProps {
   doctorId: string
@@ -33,6 +34,9 @@ export function ConsultationDocumentation({
   onConsultationSelect,
   className 
 }: ConsultationDocumentationProps) {
+  const t = useTranslations('consultation.documentation')
+  const tCommon = useTranslations('common')
+  
   const [activeTab, setActiveTab] = useState(activeConsultationId ? 'notes' : 'history')
   const [selectedConsultation, setSelectedConsultation] = useState<Consultation | null>(null)
 
@@ -60,12 +64,12 @@ export function ConsultationDocumentation({
   // Export all consultation notes for a patient
   const exportAllConsultationNotes = async () => {
     if (!patientId) {
-      toast.error('No patient selected for export')
+      toast.error(tCommon('messages.noData'))
       return
     }
 
     try {
-      toast.loading('Exporting consultation notes...')
+      toast.loading(tCommon('status.loading'))
       
       const exportContent = await exportPatientConsultationNotes(doctorId, patientId)
       
@@ -80,10 +84,10 @@ export function ConsultationDocumentation({
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       
-      toast.success('Consultation notes exported successfully')
+      toast.success(tCommon('messages.success'))
     } catch (error) {
       console.error('Error exporting consultation notes:', error)
-      toast.error('Failed to export consultation notes')
+      toast.error(tCommon('messages.error'))
     }
   }
 
@@ -97,7 +101,7 @@ export function ConsultationDocumentation({
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="notes" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Notes
+              {t('notes')}
               {hasUnsavedChanges && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 text-xs">
                   •
@@ -106,7 +110,7 @@ export function ConsultationDocumentation({
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
-              History
+              {t('history')}
             </TabsTrigger>
           </TabsList>
 
@@ -117,9 +121,9 @@ export function ConsultationDocumentation({
                 variant={syncStatus === 'connected' ? 'default' : 'secondary'}
                 className="text-xs"
               >
-                {syncStatus === 'connected' ? 'Synced' : 
-                 syncStatus === 'syncing' ? 'Syncing...' : 
-                 syncStatus === 'error' ? 'Error' : 'Offline'}
+                {syncStatus === 'connected' ? t('synced') : 
+                 syncStatus === 'syncing' ? t('syncing') : 
+                 syncStatus === 'error' ? t('error') : t('offline')}
               </Badge>
             )}
 
@@ -131,7 +135,7 @@ export function ConsultationDocumentation({
                 onClick={exportAllConsultationNotes}
               >
                 <Download className="h-4 w-4 mr-2" />
-                Export All
+                {t('exportAll')}
               </Button>
             )}
           </div>
@@ -151,11 +155,11 @@ export function ConsultationDocumentation({
               <CardContent className="p-8">
                 <div className="text-center text-muted-foreground">
                   <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No Active Consultation</h3>
+                  <h3 className="text-lg font-medium mb-2">{t('noActiveConsultation')}</h3>
                   <p className="mb-4">
                     {activeConsultationId 
-                      ? 'Loading consultation notes...' 
-                      : 'Select a consultation from history to view or edit notes'
+                      ? t('loadingNotes') 
+                      : t('selectFromHistory')
                     }
                   </p>
                   {!activeConsultationId && (
@@ -164,7 +168,7 @@ export function ConsultationDocumentation({
                       onClick={() => setActiveTab('history')}
                     >
                       <History className="h-4 w-4 mr-2" />
-                      View History
+                      {t('viewHistory')}
                     </Button>
                   )}
                 </div>
@@ -190,7 +194,7 @@ export function ConsultationDocumentation({
               <div className="flex items-center gap-2">
                 <Eye className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  Viewing consultation from{' '}
+                  {t('viewingConsultation')}{' '}
                   {selectedConsultation.startTime.toDate().toLocaleDateString()}
                 </span>
                 <Badge variant="outline" className="text-xs">
@@ -208,7 +212,7 @@ export function ConsultationDocumentation({
                   }
                 }}
               >
-                Clear Selection
+                {t('clearSelection')}
               </Button>
             </div>
           </CardContent>

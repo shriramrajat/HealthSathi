@@ -8,6 +8,7 @@ import { FirebaseErrorBoundary } from "@/components/firebase-error-boundary"
 import { QueryProvider } from "@/lib/providers/query-provider"
 import { RealTimeSyncProvider } from "@/components/providers/real-time-sync-provider"
 import { AccessibilityProvider } from "@/components/accessibility/accessibility-provider"
+import { LanguageProvider } from "@/components/providers/language-provider"
 import { Suspense } from "react"
 import "./globals.css"
 import "../styles/accessibility.css"
@@ -26,23 +27,25 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <QueryProvider>
-          <FirebaseErrorBoundary>
-            <AccessibilityProvider>
-              <Suspense fallback={null}>
-                <AuthProvider>
-                  <RealTimeSyncProvider
-                    enableAutoInit={true}
-                    showNetworkToasts={true}
-                    showConflictToasts={true}
-                  >
-                    {children}
-                  </RealTimeSyncProvider>
-                </AuthProvider>
-              </Suspense>
-            </AccessibilityProvider>
-          </FirebaseErrorBoundary>
-        </QueryProvider>
+        <LanguageProvider>
+          <QueryProvider>
+            <FirebaseErrorBoundary>
+              <AccessibilityProvider>
+                <Suspense fallback={null}>
+                  <AuthProvider>
+                    <RealTimeSyncProvider
+                      enableAutoInit={true}
+                      showNetworkToasts={true}
+                      showConflictToasts={true}
+                    >
+                      {children}
+                    </RealTimeSyncProvider>
+                  </AuthProvider>
+                </Suspense>
+              </AccessibilityProvider>
+            </FirebaseErrorBoundary>
+          </QueryProvider>
+        </LanguageProvider>
         <Analytics />
       </body>
     </html>

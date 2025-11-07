@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { LanguageSwitcher } from "@/components/ui/language-switcher"
 import { Heart, User, LogOut, Settings, ChevronDown } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect } from "react"
@@ -112,6 +113,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
             {/* User Profile and Actions */}
             <div className="flex items-center space-x-4">
+              {/* Language Switcher */}
+              <LanguageSwitcher variant="compact" size="sm" />
+              
               {/* Role Badge */}
               <Badge variant={getRoleBadgeVariant(user.role as UserRole)}>
                 {getRoleDisplayName(user.role as UserRole)}

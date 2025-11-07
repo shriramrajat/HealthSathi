@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import createIntlMiddleware from 'next-intl/middleware';
+import { locales } from './i18n';
 
 // Define protected routes and their required roles
 const PROTECTED_ROUTES = {
@@ -97,6 +99,13 @@ function redirectToDashboard(role: string, request: NextRequest): NextResponse {
   return NextResponse.redirect(dashboardUrl)
 }
 
+// Create the internationalization middleware
+const intlMiddleware = createIntlMiddleware({
+  locales,
+  defaultLocale: 'en',
+  localePrefix: 'as-needed'
+});
+
 /**
  * Main middleware function
  */
@@ -113,13 +122,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Handle internationalization first
+  const intlResponse = intlMiddleware(request);
+  
+  // If intl middleware returns a response (redirect), use it
+  if (intlResponse) {
+    return intlResponse;
+  }
+
+  // Extract locale from pathname for auth checks
+  const locale = locales.find(loc => pathname.startsWith(`/${loc}`)) || 'en';
+  const pathnameWithoutLocale = pathname.replace(`/${locale}`, '') || '/';
+
   // Allow public routes
-  if (isPublicRoute(pathname)) {
+  if (isPublicRoute(pathnameWithoutLocale)) {
     return NextResponse.next()
   }
 
   // Check if route requires authentication
-  if (requiresAuth(pathname)) {
+  if (requiresAuth(pathnameWithoutLocale)) {
     const user = await getUserFromToken(request)
     
     // Redirect to login if not authenticated

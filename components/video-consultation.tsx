@@ -14,6 +14,7 @@ import { consultationService, updateConsultationNotes } from "@/lib/services/con
 import { jitsiService, JitsiService, JitsiEventHandlers } from "@/lib/services/jitsi-service"
 import { notificationTriggersService } from "@/lib/services/notification-triggers"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 
 interface VideoConsultationProps {
   roomId: string
@@ -37,6 +38,9 @@ export default function VideoConsultation({
   patient,
   onConsultationUpdate,
 }: VideoConsultationProps) {
+  const t = useTranslations('consultation.videoConsultation')
+  const tCommon = useTranslations('common')
+  
   const [isVideoEnabled, setIsVideoEnabled] = useState(true)
   const [isAudioEnabled, setIsAudioEnabled] = useState(true)
   const [isCallActive, setIsCallActive] = useState(false)
@@ -168,13 +172,13 @@ export default function VideoConsultation({
     }
     
     await saveNotesImmediately(consultationNotes)
-    toast.success('Notes saved successfully')
+    toast.success(t('messages.notesSaved'))
   }, [saveNotesImmediately, consultationNotes])
 
   // Enhanced consultation summary generation with real-time data
   const generateConsultationSummary = useCallback(async () => {
     if (!consultation?.id) {
-      toast.error('Cannot generate summary: Consultation not found')
+      toast.error(t('messages.cannotGenerateSummary'))
       return
     }
 
@@ -242,18 +246,18 @@ Summary Version: 2.0
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       
-      toast.success('Comprehensive consultation summary generated and downloaded')
+      toast.success(t('messages.summaryGenerated'))
       return fullSummary
     } catch (error) {
       console.error('Error generating consultation summary:', error)
-      toast.error('Failed to generate consultation summary')
+      toast.error(t('messages.summaryFailed'))
     }
   }, [consultation, patientName, doctorName, callDuration, roomId, isCallActive, consultationNotes, participantCount, isRecording, isVideoEnabled, isAudioEnabled, connectionQuality, isScreenSharing, patient])
 
   // Enhanced recording functionality with Jitsi and consultation service integration
   const toggleRecording = useCallback(async () => {
     if (!consultation?.id) {
-      toast.error('Cannot record: Consultation not found')
+      toast.error(t('messages.cannotRecord'))
       return
     }
 
@@ -275,7 +279,7 @@ Summary Version: 2.0
           autoSaveNotes(updatedNotes)
         }
         
-        toast.success('Recording started')
+        toast.success(t('messages.recordingStarted'))
       } else {
         // Stop recording via Jitsi
         if (jitsiService.isConferenceActive()) {
@@ -293,11 +297,11 @@ Summary Version: 2.0
           autoSaveNotes(updatedNotes)
         }
         
-        toast.success('Recording stopped')
+        toast.success(t('messages.recordingStopped'))
       }
     } catch (error) {
       console.error('Error toggling recording:', error)
-      toast.error(`Failed to ${!isRecording ? 'start' : 'stop'} recording`)
+      toast.error(!isRecording ? t('messages.recordingStartFailed') : t('messages.recordingStopFailed'))
     }
   }, [isRecording, consultation, userRole, autoSaveEnabled, consultationNotes, autoSaveNotes])
 
@@ -317,7 +321,7 @@ Summary Version: 2.0
 
   const startCall = async () => {
     if (!jitsiContainerRef.current) {
-      toast.error('Video container not ready')
+      toast.error(t('messages.videoContainerNotReady'))
       return
     }
 
@@ -357,7 +361,7 @@ Summary Version: 2.0
             }
           }
           
-          toast.success('Successfully joined video consultation')
+          toast.success(t('messages.joinedSuccessfully'))
         },
         
         onVideoConferenceLeft: (event) => {
@@ -485,7 +489,7 @@ Summary Version: 2.0
       
     } catch (error) {
       console.error('Error starting video call:', error)
-      toast.error('Failed to start video call. Please try again.')
+      toast.error(t('messages.failedToStart'))
       setIsConnecting(false)
     }
   }
@@ -609,10 +613,10 @@ Summary Version: 2.0
         [deviceType]: deviceId
       }))
       
-      toast.success(`${deviceType} device changed successfully`)
+      toast.success(t('messages.deviceChangedSuccess', { deviceType }))
     } catch (error) {
       console.error(`Error changing ${deviceType} device:`, error)
-      toast.error(`Failed to change ${deviceType} device`)
+      toast.error(t('messages.deviceChangeFailed', { deviceType }))
     }
   }
 
@@ -641,12 +645,12 @@ Summary Version: 2.0
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center">
             <Video className="h-6 w-6 mr-2" />
-            Video Consultation
+            {t('title')}
           </CardTitle>
           <CardDescription>
             {userRole === "patient"
-              ? `Connect with ${doctorName || "your doctor"}`
-              : `Consultation with ${patientName || "patient"}`}
+              ? `${t('connectWith')} ${doctorName || tCommon('navigation.doctor')}`
+              : `${t('consultationWith')} ${patientName || t('patient')}`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -656,9 +660,9 @@ Summary Version: 2.0
             </div>
 
             <div className="space-y-2">
-              <p className="font-medium">Room ID: {roomId}</p>
+              <p className="font-medium">{t('roomId')}: {roomId}</p>
               <p className="text-sm text-muted-foreground">
-                {userRole === "patient" ? "Click start to begin your consultation" : "Start the video call when ready"}
+                {userRole === "patient" ? t('clickToStart') : t('startWhenReady')}
               </p>
             </div>
 
@@ -673,7 +677,7 @@ Summary Version: 2.0
 
             <Button onClick={startCall} size="lg" className="w-full">
               <Video className="h-5 w-5 mr-2" />
-              Start Video Call
+              {t('startVideoCall')}
             </Button>
           </div>
         </CardContent>
@@ -687,8 +691,8 @@ Summary Version: 2.0
         <CardContent className="pt-6">
           <div className="text-center space-y-4">
             <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            <p className="font-medium">Connecting to video call...</p>
-            <p className="text-sm text-muted-foreground">Please wait while we establish the connection</p>
+            <p className="font-medium">{t('connecting')}</p>
+            <p className="text-sm text-muted-foreground">{t('pleaseWait')}</p>
           </div>
         </CardContent>
       </Card>
@@ -704,13 +708,13 @@ Summary Version: 2.0
             <div className="flex items-center space-x-4">
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                Live
+                {t('live')}
               </Badge>
               <div>
                 <p className="font-medium">
-                  {userRole === "patient" ? `Consultation with ${doctorName}` : `Patient: ${patientName}`}
+                  {userRole === "patient" ? `${t('consultationWith')} ${doctorName}` : `${t('patient')}: ${patientName}`}
                 </p>
-                <p className="text-sm text-muted-foreground">Duration: {formatDuration(callDuration)}</p>
+                <p className="text-sm text-muted-foreground">{t('duration')}: {formatDuration(callDuration)}</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -744,7 +748,7 @@ Summary Version: 2.0
                     <div className="text-center text-white">
                       <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
                       <p className="text-lg font-medium">
-                        {isConnecting ? 'Connecting...' : 'Video will appear here'}
+                        {isConnecting ? t('connecting') : t('videoWillAppear')}
                       </p>
                       {isConnecting && (
                         <div className="mt-4">
@@ -760,7 +764,7 @@ Summary Version: 2.0
                   <div className="absolute top-4 left-4 z-10">
                     <Badge variant="secondary" className="bg-green-100 text-green-800">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                      Connected
+                      {t('status.connected')}
                     </Badge>
                   </div>
                 )}
@@ -770,7 +774,7 @@ Summary Version: 2.0
                   <div className="absolute top-4 right-4 z-10">
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                       <Monitor className="h-3 w-3 mr-1" />
-                      Screen Sharing
+                      {t('status.screenSharing')}
                     </Badge>
                   </div>
                 )}
@@ -866,22 +870,22 @@ Summary Version: 2.0
           {showSettings && isCallActive && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Device Settings</CardTitle>
+                <CardTitle className="text-sm">{t('deviceSettings.title')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Audio Input */}
                 {availableDevices.audioInput.length > 0 && (
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">Microphone</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t('deviceSettings.microphone')}</label>
                     <select
                       value={selectedDevices.audioInput || ''}
                       onChange={(e) => handleDeviceChange('audioInput', e.target.value)}
                       className="w-full text-xs p-2 border rounded"
                     >
-                      <option value="">Default</option>
+                      <option value="">{t('deviceSettings.default')}</option>
                       {availableDevices.audioInput.map((device) => (
                         <option key={device.deviceId} value={device.deviceId}>
-                          {device.label || `Microphone ${device.deviceId.substring(0, 8)}`}
+                          {device.label || `${t('deviceSettings.microphone')} ${device.deviceId.substring(0, 8)}`}
                         </option>
                       ))}
                     </select>
@@ -891,16 +895,16 @@ Summary Version: 2.0
                 {/* Audio Output */}
                 {availableDevices.audioOutput.length > 0 && (
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">Speaker</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t('deviceSettings.speaker')}</label>
                     <select
                       value={selectedDevices.audioOutput || ''}
                       onChange={(e) => handleDeviceChange('audioOutput', e.target.value)}
                       className="w-full text-xs p-2 border rounded"
                     >
-                      <option value="">Default</option>
+                      <option value="">{t('deviceSettings.default')}</option>
                       {availableDevices.audioOutput.map((device) => (
                         <option key={device.deviceId} value={device.deviceId}>
-                          {device.label || `Speaker ${device.deviceId.substring(0, 8)}`}
+                          {device.label || `${t('deviceSettings.speaker')} ${device.deviceId.substring(0, 8)}`}
                         </option>
                       ))}
                     </select>
@@ -910,16 +914,16 @@ Summary Version: 2.0
                 {/* Video Input */}
                 {availableDevices.videoInput.length > 0 && (
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">Camera</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t('deviceSettings.camera')}</label>
                     <select
                       value={selectedDevices.videoInput || ''}
                       onChange={(e) => handleDeviceChange('videoInput', e.target.value)}
                       className="w-full text-xs p-2 border rounded"
                     >
-                      <option value="">Default</option>
+                      <option value="">{t('deviceSettings.default')}</option>
                       {availableDevices.videoInput.map((device) => (
                         <option key={device.deviceId} value={device.deviceId}>
-                          {device.label || `Camera ${device.deviceId.substring(0, 8)}`}
+                          {device.label || `${t('deviceSettings.camera')} ${device.deviceId.substring(0, 8)}`}
                         </option>
                       ))}
                     </select>
@@ -928,15 +932,15 @@ Summary Version: 2.0
 
                 {/* Connection Quality */}
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Connection Quality</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t('deviceSettings.connectionQuality')}</label>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs">Quality:</span>
+                    <span className="text-xs">{t('deviceSettings.quality')}:</span>
                     <Badge variant={
                       connectionQuality === 'excellent' ? 'default' : 
                       connectionQuality === 'good' ? 'secondary' : 
                       connectionQuality === 'poor' ? 'destructive' : 'outline'
                     }>
-                      {connectionQuality}
+                      {t(`deviceSettings.${connectionQuality}`)}
                     </Badge>
                   </div>
                 </div>
@@ -947,7 +951,7 @@ Summary Version: 2.0
           {showChat && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Chat</CardTitle>
+                <CardTitle className="text-sm">{t('chat.title')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="h-48 overflow-y-auto space-y-2">
@@ -964,11 +968,11 @@ Summary Version: 2.0
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-                    placeholder="Type a message..."
+                    placeholder={t('chat.typeMessage')}
                     className="flex-1 px-2 py-1 text-sm border rounded"
                   />
                   <Button onClick={sendMessage} size="sm">
-                    Send
+                    {t('chat.send')}
                   </Button>
                 </div>
               </CardContent>
@@ -981,17 +985,17 @@ Summary Version: 2.0
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm">Live Notes</CardTitle>
+                    <CardTitle className="text-sm">{t('liveNotes.title')}</CardTitle>
                     <div className="flex items-center gap-2">
                       <Badge variant={autoSaveEnabled ? "default" : "secondary"} className="text-xs">
-                        {autoSaveEnabled ? "Auto-save ON" : "Auto-save OFF"}
+                        {autoSaveEnabled ? t('liveNotes.autoSaveOn') : t('liveNotes.autoSaveOff')}
                       </Badge>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
                         className="h-6 w-6 p-0"
-                        title="Toggle auto-save"
+                        title={t('liveNotes.toggleAutoSave')}
                       >
                         <Save className="h-3 w-3" />
                       </Button>
@@ -1000,7 +1004,7 @@ Summary Version: 2.0
                         size="sm"
                         onClick={handleManualSave}
                         className="h-6 w-6 p-0"
-                        title="Save now"
+                        title={t('liveNotes.saveNow')}
                       >
                         <Save className="h-3 w-3 text-green-600" />
                       </Button>
@@ -1011,20 +1015,20 @@ Summary Version: 2.0
                   <Textarea
                     value={consultationNotes}
                     onChange={(e) => handleNotesChange(e.target.value)}
-                    placeholder="Notes auto-save during consultation..."
+                    placeholder={t('liveNotes.placeholder')}
                     rows={8}
                     className="text-sm"
                   />
                   <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
-                    <span>{consultationNotes.length} characters</span>
-                    <span>{autoSaveEnabled ? 'Auto-saves every 2 seconds' : 'Manual save only'}</span>
+                    <span>{consultationNotes.length} {t('liveNotes.characters')}</span>
+                    <span>{autoSaveEnabled ? t('liveNotes.autoSaveInterval') : t('liveNotes.manualSaveOnly')}</span>
                   </div>
                   
                   {/* Live event indicators */}
                   <div className="mt-2 text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                      <span>{isCallActive ? 'Live consultation - events auto-logged' : 'Consultation ended'}</span>
+                      <span>{isCallActive ? t('liveNotes.liveConsultation') : t('liveNotes.consultationEnded')}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -1034,24 +1038,24 @@ Summary Version: 2.0
               {patient && (
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Patient Context</CardTitle>
+                    <CardTitle className="text-sm">{t('patientContext.title')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Name:</span>
+                      <span className="text-muted-foreground">{t('patientContext.name')}:</span>
                       <span>{patient.name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Age:</span>
+                      <span className="text-muted-foreground">{t('patientContext.age')}:</span>
                       <span>{patient.dateOfBirth ? Math.floor((new Date().getTime() - patient.dateOfBirth.toDate().getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Gender:</span>
+                      <span className="text-muted-foreground">{t('patientContext.gender')}:</span>
                       <span className="capitalize">{patient.gender || 'N/A'}</span>
                     </div>
                     {patient.medicalHistory && patient.medicalHistory.length > 0 && (
                       <div className="pt-2">
-                        <span className="text-muted-foreground text-xs">Recent conditions:</span>
+                        <span className="text-muted-foreground text-xs">{t('patientContext.recentConditions')}:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {patient.medicalHistory.slice(0, 3).map((record, index) => (
                             <Badge key={index} variant="outline" className="text-xs">
@@ -1070,41 +1074,41 @@ Summary Version: 2.0
           {/* Enhanced Call Info */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Session Information</CardTitle>
+              <CardTitle className="text-sm">{t('sessionInfo.title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Room ID:</span>
+                <span className="text-muted-foreground">{t('sessionInfo.roomId')}:</span>
                 <span className="font-mono">{roomId}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Duration:</span>
+                <span className="text-muted-foreground">{t('sessionInfo.duration')}:</span>
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   {formatDuration(callDuration)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Participants:</span>
+                <span className="text-muted-foreground">{t('sessionInfo.participants')}:</span>
                 <span>{participantCount}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Quality:</span>
+                <span className="text-muted-foreground">{t('sessionInfo.quality')}:</span>
                 <Badge variant="outline" className="text-xs">
-                  HD
+                  {t('hd')}
                 </Badge>
               </div>
               {userRole === "doctor" && (
                 <>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Recording:</span>
+                    <span className="text-muted-foreground">{t('sessionInfo.recording')}:</span>
                     <Badge variant={isRecording ? "destructive" : "secondary"} className="text-xs">
-                      {isRecording ? "Recording" : "Not recording"}
+                      {isRecording ? t('recording') : t('notRecording')}
                     </Badge>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Notes:</span>
-                    <span>{consultationNotes.length > 0 ? "Active" : "None"}</span>
+                    <span className="text-muted-foreground">{t('sessionInfo.notes')}:</span>
+                    <span>{consultationNotes.length > 0 ? t('sessionInfo.active') : t('sessionInfo.none')}</span>
                   </div>
                 </>
               )}
@@ -1115,7 +1119,7 @@ Summary Version: 2.0
           {userRole === "doctor" && patient && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Quick Actions</CardTitle>
+                <CardTitle className="text-sm">{t('quickActions.title')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <Button
@@ -1125,7 +1129,7 @@ Summary Version: 2.0
                   onClick={() => setShowPrescriptionDialog(true)}
                 >
                   <Pill className="h-4 w-4 mr-2" />
-                  Create Prescription
+                  {t('quickActions.createPrescription')}
                 </Button>
                 <Button
                   variant="outline"
@@ -1134,7 +1138,7 @@ Summary Version: 2.0
                   onClick={generateConsultationSummary}
                 >
                   <FileText className="h-4 w-4 mr-2" />
-                  Generate Summary
+                  {t('quickActions.generateSummary')}
                 </Button>
               </CardContent>
             </Card>
@@ -1144,7 +1148,7 @@ Summary Version: 2.0
           {userRole === "doctor" && consultation && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Consultation Timer</CardTitle>
+                <CardTitle className="text-sm">{t('consultationTimer.title')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="text-center">
@@ -1152,19 +1156,19 @@ Summary Version: 2.0
                     {formatDuration(callDuration)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {isCallActive ? 'Active consultation' : 'Consultation ended'}
+                    {isCallActive ? t('consultationTimer.activeConsultation') : t('consultationTimer.consultationEnded')}
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="text-center p-2 bg-muted rounded">
-                    <div className="font-medium">Started</div>
+                    <div className="font-medium">{t('consultationTimer.started')}</div>
                     <div className="text-muted-foreground">
                       {callStartTime.current?.toLocaleTimeString() || '--:--'}
                     </div>
                   </div>
                   <div className="text-center p-2 bg-muted rounded">
-                    <div className="font-medium">Duration</div>
+                    <div className="font-medium">{t('consultationTimer.duration')}</div>
                     <div className="text-muted-foreground">
                       {Math.floor(callDuration / 60)}m {callDuration % 60}s
                     </div>
@@ -1173,10 +1177,10 @@ Summary Version: 2.0
 
                 {isCallActive && (
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Auto-tracking:</span>
+                    <span className="text-muted-foreground">{t('consultationTimer.autoTracking')}:</span>
                     <Badge variant="outline" className="text-xs">
                       <Clock className="h-3 w-3 mr-1" />
-                      Live
+                      {t('consultationTimer.live')}
                     </Badge>
                   </div>
                 )}
@@ -1191,34 +1195,34 @@ Summary Version: 2.0
         <Dialog open={showPostCallSummary} onOpenChange={setShowPostCallSummary}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Consultation Summary</DialogTitle>
+              <DialogTitle>{t('postCallSummary.title')}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="bg-muted p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Session Completed Successfully</h4>
+                <h4 className="font-medium mb-2">{t('postCallSummary.sessionCompleted')}</h4>
                 <p className="text-sm text-muted-foreground">
-                  Your consultation with {patientName} has ended. The summary has been automatically generated and saved.
+                  {t('postCallSummary.consultationEnded', { patientName })}
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h4 className="font-medium">Quick Stats</h4>
+                <h4 className="font-medium">{t('postCallSummary.quickStats')}</h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex justify-between">
-                    <span>Duration:</span>
+                    <span>{t('postCallSummary.duration')}:</span>
                     <span className="font-medium">{formatDuration(callDuration)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Participants:</span>
+                    <span>{t('postCallSummary.participants')}:</span>
                     <span className="font-medium">{participantCount}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Recording:</span>
-                    <span className="font-medium">{isRecording ? 'Yes' : 'No'}</span>
+                    <span>{t('postCallSummary.recording')}:</span>
+                    <span className="font-medium">{isRecording ? t('postCallSummary.yes') : t('postCallSummary.no')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Notes Length:</span>
-                    <span className="font-medium">{consultationNotes.length} chars</span>
+                    <span>{t('postCallSummary.notesLength')}:</span>
+                    <span className="font-medium">{consultationNotes.length} {t('postCallSummary.chars')}</span>
                   </div>
                 </div>
               </div>
@@ -1235,7 +1239,7 @@ Summary Version: 2.0
                   }}
                   className="flex-1"
                 >
-                  {patient ? 'Create Prescription' : 'Close'}
+                  {patient ? t('postCallSummary.createPrescription') : t('postCallSummary.close')}
                 </Button>
                 <Button
                   variant="outline"
@@ -1243,7 +1247,7 @@ Summary Version: 2.0
                     generateConsultationSummary()
                   }}
                 >
-                  Download Summary
+                  {t('postCallSummary.downloadSummary')}
                 </Button>
                 <Button
                   variant="outline"
@@ -1252,7 +1256,7 @@ Summary Version: 2.0
                     onEndCall?.()
                   }}
                 >
-                  Close
+                  {t('postCallSummary.close')}
                 </Button>
               </div>
             </div>
@@ -1264,7 +1268,7 @@ Summary Version: 2.0
       <Dialog open={showPrescriptionDialog} onOpenChange={setShowPrescriptionDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Post-Consultation Prescription</DialogTitle>
+            <DialogTitle>{t('prescriptionDialog.title')}</DialogTitle>
           </DialogHeader>
           
           {patient && consultation && (
@@ -1272,27 +1276,27 @@ Summary Version: 2.0
               {/* Consultation Summary */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Consultation Summary</CardTitle>
+                  <CardTitle className="text-sm">{t('prescriptionDialog.consultationSummary')}</CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm space-y-2">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="text-muted-foreground">Patient:</span> {patient.name}
+                      <span className="text-muted-foreground">{t('prescriptionDialog.patient')}:</span> {patient.name}
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Duration:</span> {formatDuration(callDuration)}
+                      <span className="text-muted-foreground">{t('prescriptionDialog.duration')}:</span> {formatDuration(callDuration)}
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Date:</span> {new Date().toLocaleDateString()}
+                      <span className="text-muted-foreground">{t('prescriptionDialog.date')}:</span> {new Date().toLocaleDateString()}
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Time:</span> {callStartTime.current?.toLocaleTimeString() || 'N/A'}
+                      <span className="text-muted-foreground">{t('prescriptionDialog.time')}:</span> {callStartTime.current?.toLocaleTimeString() || 'N/A'}
                     </div>
                   </div>
                   
                   {consultationNotes && (
                     <div className="mt-4">
-                      <span className="text-muted-foreground">Notes:</span>
+                      <span className="text-muted-foreground">{t('prescriptionDialog.notes')}:</span>
                       <div className="mt-1 p-2 bg-muted rounded text-xs max-h-20 overflow-y-auto">
                         {consultationNotes}
                       </div>
@@ -1309,12 +1313,12 @@ Summary Version: 2.0
                   try {
                     // Here you would call your prescription service to create the prescription
                     // For now, we'll just show success and close the dialog
-                    toast.success('Prescription created successfully')
+                    toast.success(t('messages.prescriptionCreated'))
                     setShowPrescriptionDialog(false)
                     onEndCall?.()
                   } catch (error) {
                     console.error('Error creating prescription:', error)
-                    toast.error('Failed to create prescription')
+                    toast.error(t('messages.prescriptionFailed'))
                   }
                 }}
                 onCancel={() => {

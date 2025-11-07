@@ -10,17 +10,21 @@ import { NotificationPreferences } from '@/components/notifications/notification
 import { NotificationSetupGuide } from '@/components/notifications/notification-setup-guide'
 import NotificationTriggersDemo from '@/components/notifications/notification-triggers-demo'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
 
 export default function NotificationsDemoPage() {
   return (
     <NotificationProvider>
       <div className="container mx-auto py-8 px-4">
         <div className="max-w-4xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Notification System Demo</h1>
-            <p className="text-muted-foreground">
-              Test and configure the Firebase Cloud Messaging notification system
-            </p>
+          <div className="mb-8 flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Notification System Demo</h1>
+              <p className="text-muted-foreground">
+                Test and configure the Firebase Cloud Messaging notification system
+              </p>
+            </div>
+            <LanguageSwitcher variant="compact" size="sm" />
           </div>
 
           <Tabs defaultValue="setup" className="space-y-6">

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { LanguageSwitcher } from "@/components/ui/language-switcher"
 import {
   User,
   Phone,
@@ -245,6 +246,7 @@ export default function PatientRecordPage() {
             </div>
             
             <div className="flex items-center space-x-2">
+              <LanguageSwitcher variant="compact" size="sm" />
               <Badge variant="outline" className="font-mono">
                 <QrCode className="h-3 w-3 mr-1" />
                 {patient.qrId}

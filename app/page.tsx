@@ -2,9 +2,10 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,7 +16,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { Heart, UserPlus, LogIn, Loader2, AlertCircle } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
-import { loginSchema, registrationSchema, passwordResetSchema, type LoginFormData, type RegistrationFormData, type PasswordResetFormData } from "@/lib/validation-schemas"
+import { LanguageSwitcher } from "@/components/ui/language-switcher"
+import { createValidationSchemas, type LoginFormData, type RegistrationFormData, type PasswordResetFormData } from "@/lib/validation-schemas-i18n"
 
 export default function HomePage() {
   const [isLogin, setIsLogin] = useState(true)
@@ -25,6 +27,13 @@ export default function HomePage() {
   const [resetEmailSent, setResetEmailSent] = useState(false)
   
   const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth()
+  const t = useTranslations('auth')
+
+  // Create validation schemas with translated error messages
+  const { loginSchema, registrationSchema, passwordResetSchema } = useMemo(
+    () => createValidationSchemas((key: string) => t(key)),
+    [t]
+  )
 
   // Login form
   const loginForm = useForm<LoginFormData>({
@@ -134,11 +143,17 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-br from-background to-card flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <Heart className="h-12 w-12 text-primary mr-2" />
-            <h1 className="text-3xl font-bold text-foreground">Rural Health</h1>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex-1" />
+            <div className="flex items-center">
+              <Heart className="h-12 w-12 text-primary mr-2" />
+              <h1 className="text-3xl font-bold text-foreground">{t('appTitle')}</h1>
+            </div>
+            <div className="flex-1 flex justify-end">
+              <LanguageSwitcher variant="compact" size="sm" />
+            </div>
           </div>
-          <p className="text-muted-foreground">Connecting rural communities with quality healthcare</p>
+          <p className="text-muted-foreground">{t('appSubtitle')}</p>
         </div>
 
         <Card>
@@ -148,31 +163,31 @@ export default function HomePage() {
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="login" className="flex items-center gap-2" onClick={switchToLogin}>
                     <LogIn className="h-4 w-4" />
-                    Login
+                    {t('tabs.login')}
                   </TabsTrigger>
                   <TabsTrigger value="register" className="flex items-center gap-2" onClick={switchToRegister}>
                     <UserPlus className="h-4 w-4" />
-                    Register
+                    {t('tabs.register')}
                   </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="login">
-                  <CardTitle>Welcome Back</CardTitle>
-                  <CardDescription>Sign in to access your healthcare dashboard</CardDescription>
+                  <CardTitle>{t('login.title')}</CardTitle>
+                  <CardDescription>{t('login.subtitle')}</CardDescription>
                 </TabsContent>
 
                 <TabsContent value="register">
-                  <CardTitle>Create Account</CardTitle>
-                  <CardDescription>Join our rural health network</CardDescription>
+                  <CardTitle>{t('register.title')}</CardTitle>
+                  <CardDescription>{t('register.subtitle')}</CardDescription>
                 </TabsContent>
               </Tabs>
             ) : (
               <>
-                <CardTitle>Reset Password</CardTitle>
+                <CardTitle>{t('forgotPassword.title')}</CardTitle>
                 <CardDescription>
                   {resetEmailSent 
-                    ? "Check your email for password reset instructions"
-                    : "Enter your email to receive password reset instructions"
+                    ? t('forgotPassword.subtitleSuccess')
+                    : t('forgotPassword.subtitle')
                   }
                 </CardDescription>
               </>
@@ -192,7 +207,7 @@ export default function HomePage() {
             {resetEmailSent && (
               <Alert className="mb-4">
                 <AlertDescription>
-                  Password reset email sent! Check your inbox and follow the instructions to reset your password.
+                  {t('forgotPassword.emailSentMessage')}
                 </AlertDescription>
               </Alert>
             )}
@@ -201,11 +216,11 @@ export default function HomePage() {
               /* Password Reset Form */
               <form onSubmit={resetForm.handleSubmit(handlePasswordReset)} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="reset-email">Email</Label>
+                  <Label htmlFor="reset-email">{t('forgotPassword.email')}</Label>
                   <Input
                     id="reset-email"
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder={t('forgotPassword.emailPlaceholder')}
                     {...resetForm.register("email")}
                     disabled={isSubmitting || resetEmailSent}
                   />
@@ -223,12 +238,12 @@ export default function HomePage() {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Sending...
+                        {t('forgotPassword.submitting')}
                       </>
                     ) : resetEmailSent ? (
-                      "Email Sent"
+                      t('forgotPassword.emailSent')
                     ) : (
-                      "Send Reset Email"
+                      t('forgotPassword.submit')
                     )}
                   </Button>
 
@@ -238,7 +253,7 @@ export default function HomePage() {
                     className="w-full"
                     onClick={switchToLogin}
                   >
-                    Back to Login
+                    {t('forgotPassword.backToLogin')}
                   </Button>
                 </div>
               </form>
@@ -247,11 +262,11 @@ export default function HomePage() {
               <div className="space-y-4">
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-email">{t('login.email')}</Label>
                     <Input
                       id="login-email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder={t('login.emailPlaceholder')}
                       {...loginForm.register("email")}
                       disabled={isSubmitting}
                     />
@@ -261,11 +276,11 @@ export default function HomePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
+                    <Label htmlFor="login-password">{t('login.password')}</Label>
                     <Input
                       id="login-password"
                       type="password"
-                      placeholder="Enter your password"
+                      placeholder={t('login.passwordPlaceholder')}
                       {...loginForm.register("password")}
                       disabled={isSubmitting}
                     />
@@ -278,10 +293,10 @@ export default function HomePage() {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing In...
+                        {t('login.submitting')}
                       </>
                     ) : (
-                      "Sign In"
+                      t('login.submit')
                     )}
                   </Button>
                 </form>
@@ -291,7 +306,7 @@ export default function HomePage() {
                     <Separator className="w-full" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                    <span className="bg-background px-2 text-muted-foreground">{t('login.orContinueWith')}</span>
                   </div>
                 </div>
 
@@ -324,7 +339,7 @@ export default function HomePage() {
                       />
                     </svg>
                   )}
-                  Continue with Google
+                  {t('login.socialLogin.google')}
                 </Button>
 
                 <div className="text-center">
@@ -333,7 +348,7 @@ export default function HomePage() {
                     className="text-sm text-muted-foreground"
                     onClick={() => setShowForgotPassword(true)}
                   >
-                    Forgot your password?
+                    {t('login.forgotPassword')}
                   </Button>
                 </div>
               </div>
@@ -342,11 +357,11 @@ export default function HomePage() {
               <div className="space-y-4">
                 <form onSubmit={registrationForm.handleSubmit(handleRegistration)} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="register-email">Email</Label>
+                    <Label htmlFor="register-email">{t('register.email')}</Label>
                     <Input
                       id="register-email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder={t('register.emailPlaceholder')}
                       {...registrationForm.register("email")}
                       disabled={isSubmitting}
                     />
@@ -356,11 +371,11 @@ export default function HomePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-password">Password</Label>
+                    <Label htmlFor="register-password">{t('register.password')}</Label>
                     <Input
                       id="register-password"
                       type="password"
-                      placeholder="Enter your password"
+                      placeholder={t('register.passwordPlaceholder')}
                       {...registrationForm.register("password")}
                       disabled={isSubmitting}
                     />
@@ -370,11 +385,11 @@ export default function HomePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm Password</Label>
+                    <Label htmlFor="confirm-password">{t('register.confirmPassword')}</Label>
                     <Input
                       id="confirm-password"
                       type="password"
-                      placeholder="Confirm your password"
+                      placeholder={t('register.confirmPasswordPlaceholder')}
                       {...registrationForm.register("confirmPassword")}
                       disabled={isSubmitting}
                     />
@@ -384,11 +399,11 @@ export default function HomePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-name">Full Name</Label>
+                    <Label htmlFor="register-name">{t('register.fullName')}</Label>
                     <Input
                       id="register-name"
                       type="text"
-                      placeholder="Enter your full name"
+                      placeholder={t('register.fullNamePlaceholder')}
                       {...registrationForm.register("name")}
                       disabled={isSubmitting}
                     />
@@ -398,20 +413,20 @@ export default function HomePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-role">Role</Label>
+                    <Label htmlFor="register-role">{t('register.role')}</Label>
                     <Select 
                       value={registrationForm.watch("role")} 
                       onValueChange={(value) => registrationForm.setValue("role", value as any)}
                       disabled={isSubmitting}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
+                        <SelectValue placeholder={t('register.roleSelectPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="patient">Patient</SelectItem>
-                        <SelectItem value="doctor">Doctor</SelectItem>
-                        <SelectItem value="pharmacy">Pharmacy</SelectItem>
-                        <SelectItem value="chw">Community Health Worker</SelectItem>
+                        <SelectItem value="patient">{t('register.roles.patient')}</SelectItem>
+                        <SelectItem value="doctor">{t('register.roles.doctor')}</SelectItem>
+                        <SelectItem value="pharmacy">{t('register.roles.pharmacy')}</SelectItem>
+                        <SelectItem value="chw">{t('register.roles.chw')}</SelectItem>
                       </SelectContent>
                     </Select>
                     {registrationForm.formState.errors.role && (
@@ -420,11 +435,11 @@ export default function HomePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-age">Age (Optional)</Label>
+                    <Label htmlFor="register-age">{t('register.age')}</Label>
                     <Input
                       id="register-age"
                       type="number"
-                      placeholder="Enter your age"
+                      placeholder={t('register.agePlaceholder')}
                       min="1"
                       max="150"
                       {...registrationForm.register("age", { 
@@ -441,10 +456,10 @@ export default function HomePage() {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating Account...
+                        {t('register.submitting')}
                       </>
                     ) : (
-                      "Create Account"
+                      t('register.submit')
                     )}
                   </Button>
                 </form>
@@ -454,7 +469,7 @@ export default function HomePage() {
                     <Separator className="w-full" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                    <span className="bg-background px-2 text-muted-foreground">{t('register.orContinueWith')}</span>
                   </div>
                 </div>
 
@@ -487,7 +502,7 @@ export default function HomePage() {
                       />
                     </svg>
                   )}
-                  Continue with Google
+                  {t('register.socialLogin.google')}
                 </Button>
               </div>
             )}
@@ -495,7 +510,7 @@ export default function HomePage() {
         </Card>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>Secure • Private • Accessible</p>
+          <p>{t('footer')}</p>
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { NotificationBell, NotificationDisplay } from '@/components/notifications'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { useNotificationContext } from '@/components/providers/notification-provider'
 import { notificationService } from '@/lib/services/notification-service'
 
@@ -47,7 +48,10 @@ function NotificationUIDemo() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <div className="text-center">
+      <div className="text-center relative">
+        <div className="absolute top-0 right-0">
+          <LanguageSwitcher variant="compact" size="sm" />
+        </div>
         <h1 className="text-3xl font-bold">Notification UI Components Demo</h1>
         <p className="text-muted-foreground mt-2">
           Test and preview the notification system components

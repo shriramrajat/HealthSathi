@@ -5,6 +5,7 @@ import { useState } from "react"
 import VideoConsultation from "@/components/video-consultation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { LanguageSwitcher } from "@/components/ui/language-switcher"
 import { ArrowLeft, Heart } from "lucide-react"
 
 // Mock data - in real app this would come from authentication context
@@ -69,6 +70,7 @@ export default function ConsultationPage() {
               <Heart className="h-8 w-8 text-primary mr-3" />
               <h1 className="text-xl font-semibold text-foreground">Video Consultation</h1>
             </div>
+            <LanguageSwitcher variant="compact" size="sm" />
           </div>
         </div>
       </header>

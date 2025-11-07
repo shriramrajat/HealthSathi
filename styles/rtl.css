@@ -1,0 +1,289 @@
+/**
+ * RTL (Right-to-Left) Layout Support Styles
+ * 
+ * This file contains global CSS rules for RTL language support.
+ * It handles layout mirroring and direction-specific styling.
+ */
+
+/* RTL Direction Attribute */
+[dir='rtl'] {
+  direction: rtl;
+  text-align: start;
+}
+
+[dir='ltr'] {
+  direction: ltr;
+  text-align: start;
+}
+
+/* RTL-specific utility classes */
+.rtl-mirror {
+  transform: scaleX(-1);
+}
+
+.rtl-flip {
+  transform: rotateY(180deg);
+}
+
+/* Direction-aware spacing utilities */
+[dir='rtl'] .ms-auto {
+  margin-inline-start: auto;
+}
+
+[dir='rtl'] .me-auto {
+  margin-inline-end: auto;
+}
+
+/* RTL-aware flexbox */
+[dir='rtl'] .flex-row {
+  flex-direction: row-reverse;
+}
+
+[dir='rtl'] .flex-row-reverse {
+  flex-direction: row;
+}
+
+/* RTL-aware grid */
+[dir='rtl'] .grid-flow-col {
+  grid-auto-flow: column reverse;
+}
+
+/* RTL-aware text alignment */
+[dir='rtl'] .text-start {
+  text-align: right;
+}
+
+[dir='rtl'] .text-end {
+  text-align: left;
+}
+
+/* RTL-aware positioning */
+[dir='rtl'] .float-start {
+  float: right;
+}
+
+[dir='rtl'] .float-end {
+  float: left;
+}
+
+/* RTL-aware transforms */
+[dir='rtl'] .translate-x-full {
+  transform: translateX(-100%);
+}
+
+[dir='rtl'] .-translate-x-full {
+  transform: translateX(100%);
+}
+
+/* RTL-aware animations */
+@keyframes slideInFromStart {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromEnd {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+[dir='rtl'] .animate-slide-in-start {
+  animation: slideInFromEnd 0.3s ease-out;
+}
+
+[dir='ltr'] .animate-slide-in-start {
+  animation: slideInFromStart 0.3s ease-out;
+}
+
+[dir='rtl'] .animate-slide-in-end {
+  animation: slideInFromStart 0.3s ease-out;
+}
+
+[dir='ltr'] .animate-slide-in-end {
+  animation: slideInFromEnd 0.3s ease-out;
+}
+
+/* RTL-aware scrollbar */
+[dir='rtl'] ::-webkit-scrollbar {
+  direction: rtl;
+}
+
+/* RTL-aware dropdown menus */
+[dir='rtl'] .dropdown-menu {
+  left: auto;
+  right: 0;
+}
+
+[dir='ltr'] .dropdown-menu {
+  left: 0;
+  right: auto;
+}
+
+/* RTL-aware tooltips */
+[dir='rtl'] .tooltip-start {
+  left: auto;
+  right: 100%;
+  margin-right: 0.5rem;
+}
+
+[dir='ltr'] .tooltip-start {
+  left: 100%;
+  right: auto;
+  margin-left: 0.5rem;
+}
+
+[dir='rtl'] .tooltip-end {
+  left: 100%;
+  right: auto;
+  margin-left: 0.5rem;
+}
+
+[dir='ltr'] .tooltip-end {
+  left: auto;
+  right: 100%;
+  margin-right: 0.5rem;
+}
+
+/* RTL-aware modals and dialogs */
+[dir='rtl'] .dialog-slide-in {
+  animation: slideInFromEnd 0.3s ease-out;
+}
+
+[dir='ltr'] .dialog-slide-in {
+  animation: slideInFromStart 0.3s ease-out;
+}
+
+/* RTL-aware navigation */
+[dir='rtl'] .nav-item::before {
+  left: auto;
+  right: 0;
+}
+
+[dir='ltr'] .nav-item::before {
+  left: 0;
+  right: auto;
+}
+
+/* RTL-aware breadcrumbs */
+[dir='rtl'] .breadcrumb-separator {
+  transform: scaleX(-1);
+}
+
+/* RTL-aware progress bars */
+[dir='rtl'] .progress-bar {
+  left: auto;
+  right: 0;
+}
+
+[dir='ltr'] .progress-bar {
+  left: 0;
+  right: auto;
+}
+
+/* RTL-aware badges and chips */
+[dir='rtl'] .badge-start {
+  left: auto;
+  right: 0;
+}
+
+[dir='ltr'] .badge-start {
+  left: 0;
+  right: auto;
+}
+
+/* RTL-aware form inputs */
+[dir='rtl'] input[type='search']::-webkit-search-cancel-button {
+  margin-left: 0;
+  margin-right: 0.5rem;
+}
+
+[dir='ltr'] input[type='search']::-webkit-search-cancel-button {
+  margin-left: 0.5rem;
+  margin-right: 0;
+}
+
+/* RTL-aware checkboxes and radio buttons */
+[dir='rtl'] input[type='checkbox'],
+[dir='rtl'] input[type='radio'] {
+  margin-left: 0.5rem;
+  margin-right: 0;
+}
+
+[dir='ltr'] input[type='checkbox'],
+[dir='ltr'] input[type='radio'] {
+  margin-left: 0;
+  margin-right: 0.5rem;
+}
+
+/* RTL-aware list items */
+[dir='rtl'] ul,
+[dir='rtl'] ol {
+  padding-left: 0;
+  padding-right: 2rem;
+}
+
+[dir='ltr'] ul,
+[dir='ltr'] ol {
+  padding-left: 2rem;
+  padding-right: 0;
+}
+
+/* RTL-aware icons that should be mirrored */
+[dir='rtl'] .icon-arrow,
+[dir='rtl'] .icon-chevron,
+[dir='rtl'] .icon-caret {
+  transform: scaleX(-1);
+}
+
+/* Prevent mirroring for certain elements */
+.no-rtl-mirror {
+  transform: none !important;
+}
+
+[dir='rtl'] .no-rtl-mirror {
+  transform: none !important;
+}
+
+/* RTL-aware table alignment */
+[dir='rtl'] table {
+  text-align: right;
+}
+
+[dir='ltr'] table {
+  text-align: left;
+}
+
+[dir='rtl'] th,
+[dir='rtl'] td {
+  text-align: right;
+}
+
+[dir='ltr'] th,
+[dir='ltr'] td {
+  text-align: left;
+}
+
+/* RTL-aware code blocks */
+[dir='rtl'] pre,
+[dir='rtl'] code {
+  direction: ltr;
+  text-align: left;
+}
+
+/* RTL-aware number inputs */
+[dir='rtl'] input[type='number'] {
+  direction: ltr;
+  text-align: right;
+}
+
+[dir='ltr'] input[type='number'] {
+  direction: ltr;
+  text-align: left;
+}

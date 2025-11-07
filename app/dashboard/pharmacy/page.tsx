@@ -25,35 +25,38 @@ import {
   StockManagementWithSuspense,
   PrescriptionManagementWithSuspense
 } from "@/components/lazy/lazy-dashboard-components"
-
-// Dashboard section navigation
-const dashboardSections = [
-  {
-    id: "stock",
-    title: "Manage Stock",
-    description: "Track medicine inventory and stock levels",
-    icon: Package,
-    color: "bg-blue-50 text-blue-600 border-blue-200",
-  },
-  {
-    id: "prescriptions",
-    title: "View Prescriptions",
-    description: "Process and manage prescription orders",
-    icon: FileText,
-    color: "bg-green-50 text-green-600 border-green-200",
-  },
-  {
-    id: "dispense",
-    title: "Dispense Medicine",
-    description: "Mark prescriptions as dispensed",
-    icon: CheckCircle,
-    color: "bg-purple-50 text-purple-600 border-purple-200",
-  },
-]
+import { useTranslations } from "next-intl"
 
 export default function PharmacyDashboard() {
   const { user } = useAuth()
   const [activeSection, setActiveSection] = useState<string>("stock")
+  const t = useTranslations('dashboard.pharmacy')
+  const tCommon = useTranslations('common')
+  
+  // Dashboard section navigation
+  const dashboardSections = [
+    {
+      id: "stock",
+      title: t('sections.manageStock'),
+      description: t('sections.manageStockDesc'),
+      icon: Package,
+      color: "bg-blue-50 text-blue-600 border-blue-200",
+    },
+    {
+      id: "prescriptions",
+      title: t('sections.viewPrescriptions'),
+      description: t('sections.viewPrescriptionsDesc'),
+      icon: FileText,
+      color: "bg-green-50 text-green-600 border-green-200",
+    },
+    {
+      id: "dispense",
+      title: t('sections.dispenseMedicine'),
+      description: t('sections.dispenseMedicineDesc'),
+      icon: CheckCircle,
+      color: "bg-purple-50 text-purple-600 border-purple-200",
+    },
+  ]
   
   // Performance monitoring
   const {
@@ -220,75 +223,75 @@ export default function PharmacyDashboard() {
   return (
     <>
       {/* Skip Links for Accessibility */}
-      <SkipLink href="#main-content">Skip to main content</SkipLink>
-      <SkipLink href="#pharmacy-stats">Skip to pharmacy statistics</SkipLink>
-      <SkipLink href="#pharmacy-tabs">Skip to pharmacy management tabs</SkipLink>
+      <SkipLink href="#main-content">{t('skipLinks.mainContent')}</SkipLink>
+      <SkipLink href="#pharmacy-stats">{t('skipLinks.quickStats')}</SkipLink>
+      <SkipLink href="#pharmacy-tabs">{t('skipLinks.dashboardSections')}</SkipLink>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" role="main" id="main-content">
       {/* Header Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          Pharmacy Dashboard
+          {t('title')}
         </h1>
         <p className="text-muted-foreground">
-          Manage your pharmacy operations and serve patients efficiently
+          {t('managePharmacy')}
         </p>
       </div>
 
       {/* Quick Stats Overview */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-8" id="pharmacy-stats" role="region" aria-label="Pharmacy statistics overview">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-8" id="pharmacy-stats" role="region" aria-label={t('stats.totalStock')}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Stock</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.totalStock')}</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalStock}</div>
-            <p className="text-xs text-muted-foreground">Medicine units</p>
+            <p className="text-xs text-muted-foreground">{t('stats.medicines')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.lowStockItems')}</CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{stats.lowStockItems}</div>
-            <p className="text-xs text-muted-foreground">Items need restock</p>
+            <p className="text-xs text-muted-foreground">{t('stats.items')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.expiringSoon')}</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{stats.expiringSoon}</div>
-            <p className="text-xs text-muted-foreground">Within 30 days</p>
+            <p className="text-xs text-muted-foreground">{t('stats.medicines')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.pendingPrescriptions')}</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.pendingPrescriptions}</div>
-            <p className="text-xs text-muted-foreground">To be processed</p>
+            <p className="text-xs text-muted-foreground">{t('stats.prescriptions')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Dispensed Today</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.dispensedToday')}</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats.dispensedToday}</div>
-            <p className="text-xs text-muted-foreground">Prescriptions filled</p>
+            <p className="text-xs text-muted-foreground">{t('stats.prescriptions')}</p>
           </CardContent>
         </Card>
       </div>
