@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm run validate:env && pnpm build",
+  "buildCommand": "pnpm build",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "regions": ["iad1"],

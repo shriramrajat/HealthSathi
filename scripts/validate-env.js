@@ -27,6 +27,13 @@ const optionalEnvVars = [
 
 console.log('🔍 Validating environment variables...\n');
 
+// Debug: Log all environment variables that start with NEXT_PUBLIC_
+console.log('Available NEXT_PUBLIC_ environment variables:');
+Object.keys(process.env)
+  .filter(key => key.startsWith('NEXT_PUBLIC_'))
+  .forEach(key => console.log(`  ${key}: ${process.env[key] ? 'SET' : 'NOT SET'}`));
+console.log('');
+
 // Check required variables
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
