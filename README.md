@@ -81,7 +81,7 @@ NeuraNovaa is a comprehensive healthcare platform designed to bridge the gap bet
   - **Authentication** - User management and security
   - **Storage** - File and media storage
   - **Cloud Functions** - Serverless backend logic
-- **React Query** - Data fetching and caching
+- **React Query** - Data fetching 
 
 ### Development & Testing
 - **Vitest** - Fast unit testing framework
