@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-11-10T13:41:33.728Z",
+  "environment": "development",
+  "metrics": {},
+  "buildMetrics": {
+    "buildTime": 0,
+    "success": false,
+    "error": "Command failed: npm run build\nFailed to compile.\n\n./components/ui/collapsible.tsx\nModule not found: Can't resolve '@radix-ui/react-collapsible'\n\nhttps://nextjs.org/docs/messages/module-not-found\n\nImport trace for requested module:\n./components/dashboard/consultation-history.tsx\n./components/dashboard/index.ts\n./app/dashboard/doctor/page.tsx\n\n\n> Build failed because of webpack errors\n"
+  },
+  "bundleAnalysis": {},
+  "recommendations": [
+    "Enable Bundle Analyzer Available for better performance.",
+    "Multiple UI libraries detected. Consider consolidating to reduce bundle size."
+  ],
+  "score": 90
+}

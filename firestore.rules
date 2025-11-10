@@ -15,21 +15,39 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
     
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    function isValidTimestamp(timestamp) {
+      return timestamp is timestamp && 
+             timestamp > timestamp.date(2024, 1, 1) && 
+             timestamp < timestamp.date(2030, 12, 31);
+    }
+    
+    function hasValidSize(text, maxSize) {
+      return text is string && text.size() <= maxSize;
+    }
+    
     function isValidUserData() {
       let data = request.resource.data;
       return data.keys().hasAll(['uid', 'email', 'name', 'role', 'qrId', 'createdAt', 'updatedAt', 'isActive']) &&
              data.uid is string &&
+             data.uid.size() > 0 &&
              data.email is string &&
+             data.email.matches('.*@.*\\..*') &&
              data.name is string &&
+             data.name.size() > 0 &&
              data.role in ['patient', 'doctor', 'pharmacy', 'chw'] &&
              data.qrId is string &&
+             data.qrId.size() > 0 &&
              data.createdAt is timestamp &&
              data.updatedAt is timestamp &&
              data.isActive is bool &&
              // Optional fields validation
-             (!data.keys().hasAny(['age']) || data.age is number) &&
-             (!data.keys().hasAny(['photoURL']) || data.photoURL is string) &&
-             (!data.keys().hasAny(['phoneNumber']) || data.phoneNumber is string) &&
+             (!data.keys().hasAny(['age']) || (data.age is number && data.age >= 0 && data.age <= 150)) &&
+             (!data.keys().hasAny(['photoURL']) || (data.photoURL is string && data.photoURL.size() <= 500)) &&
+             (!data.keys().hasAny(['phoneNumber']) || (data.phoneNumber is string && data.phoneNumber.size() <= 20)) &&
              (!data.keys().hasAny(['lastLoginAt']) || data.lastLoginAt is timestamp);
     }
     
@@ -328,6 +346,22 @@ service cloud.firestore {
     match /audit_log/{logId} {
       allow read: if isAuthenticated() && 
                  isOwner(resource.data.user_id);
+      // Write operations handled server-side only
+    }
+    
+    // Analytics collections - admin-only access
+    match /daily-metrics/{metricId} {
+      allow read: if isAdmin();
+      // Write operations handled server-side only
+    }
+    
+    match /doctor-analytics/{analyticsId} {
+      allow read: if isAdmin();
+      // Write operations handled server-side only
+    }
+    
+    match /pharmacy-analytics/{analyticsId} {
+      allow read: if isAdmin();
       // Write operations handled server-side only
     }
   }

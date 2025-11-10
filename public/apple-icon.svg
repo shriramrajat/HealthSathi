@@ -1,0 +1,12 @@
+<svg width="180" height="180" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="appleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="30" fill="url(#appleGrad)"/>
+  <circle cx="90" cy="65" r="23" fill="white" opacity="0.9"/>
+  <path d="M 90 92 L 90 130 M 70 111 L 110 111" stroke="white" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+  <text x="90" y="160" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="white" text-anchor="middle">NN</text>
+</svg>

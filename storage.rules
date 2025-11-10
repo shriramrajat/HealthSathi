@@ -12,13 +12,19 @@ service firebase.storage {
     }
     
     function isValidImageFile() {
-      return request.resource.contentType.matches('image/.*') &&
-             request.resource.size < 5 * 1024 * 1024; // 5MB limit
+      return request.resource.contentType.matches('image/(jpeg|png|gif|webp)') &&
+             request.resource.size < 5 * 1024 * 1024 && // 5MB limit
+             request.resource.size > 0;
     }
     
     function isValidDocumentFile() {
-      return request.resource.contentType in ['application/pdf', 'image/jpeg', 'image/png'] &&
-             request.resource.size < 10 * 1024 * 1024; // 10MB limit
+      return request.resource.contentType in ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] &&
+             request.resource.size < 10 * 1024 * 1024 && // 10MB limit
+             request.resource.size > 0;
+    }
+    
+    function getUserRole() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
     }
     
     // Profile pictures - users can only manage their own profile pictures
@@ -43,14 +49,14 @@ service firebase.storage {
     match /medical_records/{patientId}/{fileName} {
       allow read: if isAuthenticated() && 
                  (isOwner(patientId) || 
-                  firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'chw']);
+                  getUserRole() in ['doctor', 'chw']);
       
       allow write: if isAuthenticated() && 
-                  firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'chw'] &&
+                  getUserRole() in ['doctor', 'chw'] &&
                   isValidDocumentFile();
       
       allow delete: if isAuthenticated() && 
-                   firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+                   getUserRole() == 'doctor';
     }
     
     // Consultation recordings - only session participants can access
@@ -63,10 +69,24 @@ service firebase.storage {
     match /pharmacy_inventory/{pharmacyId}/{fileName} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() && 
-                  firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'pharmacy' &&
+                  getUserRole() == 'pharmacy' &&
                   isValidImageFile();
       allow delete: if isAuthenticated() && 
-                   firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'pharmacy';
+                   getUserRole() == 'pharmacy';
+    }
+    
+    // Public assets - read-only for authenticated users
+    match /public/{fileName} {
+      allow read: if isAuthenticated();
+      // Write operations handled server-side only
+    }
+    
+    // Temporary uploads - users can upload to their own temp folder
+    match /temp/{userId}/{fileName} {
+      allow read, write: if isAuthenticated() && 
+                        isOwner(userId) &&
+                        isValidImageFile();
+      allow delete: if isAuthenticated() && isOwner(userId);
     }
   }
 }

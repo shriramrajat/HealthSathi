@@ -10,9 +10,16 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Enable image optimization for production
   images: {
-    unoptimized: true,
+    unoptimized: false,
+    domains: ['firebasestorage.googleapis.com'],
+    formats: ['image/avif', 'image/webp'],
   },
+  // Enable compression
+  compress: true,
+  // Enable SWC minification for bundle size reduction
+  swcMinify: true,
 }
 
 export default withNextIntl(nextConfig);

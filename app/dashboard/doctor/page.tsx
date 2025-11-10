@@ -2,7 +2,8 @@
 
 import type React from "react"
 
-import { useState, lazy, Suspense } from "react"
+import { useState } from "react"
+import dynamic from "next/dynamic"
 import { useAuth } from "@/components/auth-provider"
 import { 
   DashboardErrorBoundary, 
@@ -22,11 +23,54 @@ import { usePerformanceMonitor, usePerformanceAlerts } from "@/lib/utils/perform
 import { useMemoizedProps, usePerformanceMemo } from "@/lib/utils/memoization"
 import { useTranslations } from "next-intl"
 
-// Lazy load heavy components for better performance
-const AnalyticsCharts = lazy(() => import("@/components/dashboard/analytics-charts").then(m => ({ default: m.AnalyticsCharts })))
-const PrescriptionManager = lazy(() => import("@/components/dashboard").then(m => ({ default: m.PrescriptionManager })))
-const ConsultationDocumentation = lazy(() => import("@/components/dashboard").then(m => ({ default: m.ConsultationDocumentation })))
-const VideoConsultation = lazy(() => import("@/components/video-consultation"))
+// Dynamically import heavy components with loading states for better performance
+const AnalyticsCharts = dynamic(
+  () => import("@/components/dashboard/analytics-charts").then(m => ({ default: m.AnalyticsCharts })),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    ),
+    ssr: false
+  }
+)
+
+const PrescriptionManager = dynamic(
+  () => import("@/components/dashboard").then(m => ({ default: m.PrescriptionManager })),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    ),
+    ssr: false
+  }
+)
+
+const ConsultationDocumentation = dynamic(
+  () => import("@/components/dashboard").then(m => ({ default: m.ConsultationDocumentation })),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    ),
+    ssr: false
+  }
+)
+
+const VideoConsultation = dynamic(
+  () => import("@/components/video-consultation"),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    ),
+    ssr: false
+  }
+)
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -132,14 +176,6 @@ export default function DoctorDashboard() {
   const [activeConsultationId, setActiveConsultationId] = useState<string>("")
   const t = useTranslations('dashboard.doctor')
   const tCommon = useTranslations('common')
-
-  // Loading component for lazy-loaded components
-  const ComponentLoader = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex items-center justify-center p-8">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      <span className="ml-2 text-sm text-muted-foreground">{t('loading.general')}</span>
-    </div>
-  )
 
   // Performance monitoring
   usePerformanceMonitor('DoctorDashboard')
@@ -548,29 +584,25 @@ export default function DoctorDashboard() {
           </TabsContent>
 
           <TabsContent value="prescriptions" className="space-y-4 sm:space-y-6">
-            <Suspense fallback={<ComponentLoader>{t('loading.prescriptionManager')}</ComponentLoader>}>
-              <PrescriptionManager
-                doctorId={user?.uid || 'default-doctor-id'}
-                patients={memoizedPatients}
-                onPrescriptionCreated={(prescriptionId) => {
-                  console.log('Prescription created:', prescriptionId)
-                  // Optionally refresh prescriptions data
-                }}
-              />
-            </Suspense>
+            <PrescriptionManager
+              doctorId={user?.uid || 'default-doctor-id'}
+              patients={memoizedPatients}
+              onPrescriptionCreated={(prescriptionId) => {
+                console.log('Prescription created:', prescriptionId)
+                // Optionally refresh prescriptions data
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="consultations" className="space-y-4 sm:space-y-6">
-            <Suspense fallback={<ComponentLoader>{t('loading.consultationDocs')}</ComponentLoader>}>
-              <ConsultationDocumentation
-                doctorId={user?.uid || 'default-doctor-id'}
-                activeConsultationId={activeConsultationId}
-                onConsultationSelect={(consultation) => {
-                  setActiveConsultationId(consultation.id)
-                  console.log('Selected consultation:', consultation)
-                }}
-              />
-            </Suspense>
+            <ConsultationDocumentation
+              doctorId={user?.uid || 'default-doctor-id'}
+              activeConsultationId={activeConsultationId}
+              onConsultationSelect={(consultation) => {
+                setActiveConsultationId(consultation.id)
+                console.log('Selected consultation:', consultation)
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
@@ -588,13 +620,11 @@ export default function DoctorDashboard() {
               )}
             </div>
 
-            <Suspense fallback={<ComponentLoader>{t('loading.analytics')}</ComponentLoader>}>
-              <AnalyticsCharts
-                data={analyticsData}
-                isLoading={isLoadingAnalytics}
-                error={analyticsError}
-              />
-            </Suspense>
+            <AnalyticsCharts
+              data={analyticsData}
+              isLoading={isLoadingAnalytics}
+              error={analyticsError}
+            />
           </TabsContent>
         </Tabs>
         </div>
