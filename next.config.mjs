@@ -20,6 +20,15 @@ const nextConfig = {
   compress: true,
   // Enable SWC minification for bundle size reduction
   swcMinify: true,
+  // Disable static page generation for auth-protected routes
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+    appDir: true,
+    serverActions: true,
+  },
+  // This tells Next.js to skip prerendering
+  skipTrailingSlashRedirect: true,
+  skipMiddlewareUrlNormalize: true,
 }
 
 export default withNextIntl(nextConfig);

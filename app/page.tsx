@@ -1,5 +1,9 @@
 "use client"
 
+// Force dynamic rendering to prevent static generation errors with auth
+export const dynamic = 'force-dynamic'
+export const dynamicParams = true
+
 import type React from "react"
 
 import { useState, useMemo } from "react"

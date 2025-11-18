@@ -1,5 +1,9 @@
 "use client"
 
+// Force dynamic rendering to prevent static generation errors with auth
+export const dynamic = 'force-dynamic'
+export const dynamicParams = true
+
 import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"

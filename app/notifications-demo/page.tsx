@@ -3,6 +3,10 @@
 
 'use client'
 
+// Force dynamic rendering to prevent static generation errors with auth
+export const dynamic = 'force-dynamic'
+export const dynamicParams = true
+
 import React from 'react'
 import { NotificationProvider } from '@/components/providers/notification-provider'
 import { NotificationPermission } from '@/components/notifications/notification-permission'

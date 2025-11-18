@@ -1,9 +1,13 @@
 "use client"
 
+// Force dynamic rendering to prevent static generation errors with auth
+export const dynamic = 'force-dynamic'
+export const dynamicParams = true
+
 import type React from "react"
 
 import { useState } from "react"
-import dynamic from "next/dynamic"
+import dynamicLoad from "next/dynamic"
 import { useAuth } from "@/components/auth-provider"
 import { 
   DashboardErrorBoundary, 
@@ -24,7 +28,7 @@ import { useMemoizedProps, usePerformanceMemo } from "@/lib/utils/memoization"
 import { useTranslations } from "next-intl"
 
 // Dynamically import heavy components with loading states for better performance
-const AnalyticsCharts = dynamic(
+const AnalyticsCharts = dynamicLoad(
   () => import("@/components/dashboard/analytics-charts").then(m => ({ default: m.AnalyticsCharts })),
   {
     loading: () => (
@@ -36,7 +40,7 @@ const AnalyticsCharts = dynamic(
   }
 )
 
-const PrescriptionManager = dynamic(
+const PrescriptionManager = dynamicLoad(
   () => import("@/components/dashboard").then(m => ({ default: m.PrescriptionManager })),
   {
     loading: () => (
@@ -48,7 +52,7 @@ const PrescriptionManager = dynamic(
   }
 )
 
-const ConsultationDocumentation = dynamic(
+const ConsultationDocumentation = dynamicLoad(
   () => import("@/components/dashboard").then(m => ({ default: m.ConsultationDocumentation })),
   {
     loading: () => (
@@ -60,7 +64,7 @@ const ConsultationDocumentation = dynamic(
   }
 )
 
-const VideoConsultation = dynamic(
+const VideoConsultation = dynamicLoad(
   () => import("@/components/video-consultation"),
   {
     loading: () => (
